@@ -67,7 +67,7 @@ a{color:var(--red);font-weight:800}
 .ball.miss{opacity:.35}
 
 /* tabs */
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 14px}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:4px 0 14px}
 .tab{border:2px solid var(--line);background:#fff;border-radius:22px;padding:10px 2px;font:800 15px/1.2 "Nunito",sans-serif;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:74px;justify-content:center}
 .tab .e{font-size:22px}
 .tab[aria-selected=true]{background:linear-gradient(180deg,#ffd45c,#ffb82e);border-color:#e6a100;box-shadow:0 5px 12px rgba(230,161,0,.35)}
@@ -130,6 +130,7 @@ details{margin-top:14px}summary{cursor:pointer;font-weight:800;color:var(--red)}
 .bars{display:flex;gap:6px;height:84px;margin-top:8px}.bars>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;font-size:12px;font-weight:700;color:var(--mute)}
 .bars i{display:block;width:100%;background:linear-gradient(180deg,#ffc233,#ff5a36);border-radius:6px 6px 0 0;min-height:2px}
 .xt .pc{font-size:14px}
+.cgl{border:2px solid var(--line);border-radius:20px;padding:12px;margin-bottom:10px}.cgl .lt{font-weight:800;font-size:14.5px}.cgb.spin{opacity:.7}
 [hidden]{display:none!important}
 @media(prefers-color-scheme:dark){
 :root{color-scheme:dark;--ink:#f6e9dc;--mute:#bda996;--line:#4d3b30;--cream:#3b2c24;--card:#2b211c;--red:#ff6b5e}
@@ -139,7 +140,7 @@ body{background:#1b1411}
 .hl.most{background:#4a2326;border-color:#7a3a3a}.hl.least{background:#1f2b45;border-color:#3a5288}.hl.gap{background:#46381b;border-color:#8a6a1e}
 .slot{background:#3b2c24;color:#8a7566}td{border-bottom-color:#3b2c24}.meter{background:#3b2c24}.tier{border-bottom-color:#4d3b30}
 }
-@media(max-width:460px){.ball{width:38px;height:38px;font-size:15px}.nums{gap:5px}.tab{font-size:14px}}
+@media(max-width:460px){.ball{width:38px;height:38px;font-size:15px}.nums{gap:5px}.tab{font-size:12.5px;padding:10px 0}.tab .e{font-size:20px}}
 </style>
 </head>
 <body>
@@ -172,6 +173,7 @@ body{background:#1b1411}
     <button class="tab" data-t="stats"><span class="e">📊</span>Thống kê</button>
     <button class="tab" data-t="pred"><span class="e">🎯</span>Dự đoán</button>
     <button class="tab" data-t="hist"><span class="e">🗂️</span>Kết quả</button>
+    <button class="tab" data-t="cage"><span class="e">🎰</span>Lồng cầu</button>
   </nav>
 
   <!-- DÒ SỐ -->
@@ -234,6 +236,16 @@ body{background:#1b1411}
   <div class="card" id="t-hist" hidden>
     <h2 id="hsTitle"></h2>
     <table><tbody id="hsBody"></tbody></table>
+  </div>
+  <div class="card" id="t-cage" hidden>
+    <div class="flex" style="justify-content:space-between"><h2 id="cgTitle" style="margin:0"></h2><button class="btn" id="cgSnd" aria-label="Âm thanh">🔇</button></div>
+    <p class="hint">5 dãy được bốc ngẫu nhiên <b>có trọng số theo thống kê</b> (mỗi dãy một cách: số nóng, lâu chưa ra, toàn thời gian, điểm tổng hợp, pha trộn). Giải trí thôi — bộ số nào cũng có cơ hội trúng như nhau! 😄</p>
+    <div class="modes" id="cgModes"></div>
+    <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:0"><input type="checkbox" id="cgDistinct"> 5 dãy không trùng số nào</label>
+    <div id="cgLines"></div>
+    <button class="btn red" id="cgGo" style="width:100%"></button>
+    <div class="row" style="justify-content:space-between;margin:18px 0 0"><b id="cgHistTitle"></b><button class="chip" id="cgClear">Xóa</button></div>
+    <div id="cgHist"></div>
   </div>
 
   <div class="foot">Nguồn dữ liệu: ketquadientoan.com (chính) và minhngoc.net.vn (dự phòng, đối chiếu chéo). Trang cá nhân phi thương mại, <b>không phải trang chính thức của Vietlott</b> — kết quả chính thức xem tại vietlott.vn. Chỉ dành cho người từ 18 tuổi; xổ số là ngẫu nhiên, hãy chơi có trách nhiệm.</div>
@@ -501,15 +513,82 @@ function renderHist() {
     <td><div class="flex" style="gap:5px">${ballsHtml(r, "sm")}</div></td><td style="text-align:right;font-weight:800;font-size:14px;white-space:nowrap">${esc(r.j)}</td></tr>`).join("");
 }
 
+/* ───────── Lồng cầu ───────── */
+const L = {mode: "full", distinct: false, sets: null, shown: 0, busy: false, snd: !!store("lcSnd"), tm: [], iv: 0};
+const LC = [["🔥", "Số nóng"], ["⏳", "Lâu chưa ra"], ["📚", "Toàn thời gian"], ["⚖️", "Điểm tổng hợp"], ["🔀", "Nóng + lâu chưa ra"]];
+const rndU = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
+let AC;
+function beep(f) { if (!L.snd) return; try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; g.gain.value = .05; o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + .06); } catch (e) {} }
+function lcStop() { L.tm.forEach(clearTimeout); L.tm = []; clearInterval(L.iv); L.busy = false; }
+function lcWeights(g) {
+  const rows = rowsOf(g), max = G[g].max, N = Math.max(5, Math.min(rows.length, +S.predN || 20));
+  const fN = new Array(max + 1).fill(0), fA = fN.slice(), gap = new Array(max + 1).fill(-1);
+  rows.forEach((r, i) => { for (const n of r.n) { fA[n]++; if (i < N) fN[n]++; if (gap[n] < 0) gap[n] = i; } });
+  for (let n = 1; n <= max; n++) if (gap[n] < 0) gap[n] = rows.length;
+  const a = zs(fN, max), b = zs(fA, max), c = zs(gap, max);
+  const sN = fN.reduce((x, y) => x + y, 0) + max, sG = gap.slice(1).reduce((x, y) => x + y, 0) + max;
+  const w = f => { const o = new Array(max + 1).fill(0); for (let n = 1; n <= max; n++) o[n] = f(n); return o; };
+  return [w(n => fN[n] + 1), w(n => gap[n] + 1), w(n => fA[n] + 1), w(n => Math.exp(.4 * a[n] + .3 * b[n] + .3 * c[n])), w(n => (fN[n] + 1) / sN + (gap[n] + 1) / sG)];
+}
+function lcGen(g) {
+  const max = G[g].max, W = lcWeights(g), used = new Set(), list = [];
+  let bw = null;
+  if (G[g].bonus) { bw = new Array(max + 1).fill(1); rowsOf(g).forEach(r => { if (r.b) bw[r.b]++; }); }
+  for (let i = 0; i < 5; i++) {
+    const w = W[i].slice(); if (L.distinct) used.forEach(n => { w[n] = 0; });
+    const n = weightedPick(w, max, rndU); n.forEach(x => used.add(x));
+    let b = null; if (bw) { const w2 = bw.slice(); n.forEach(x => { w2[x] = 0; }); b = weightedPick(w2, max, rndU, 1)[0]; }
+    list.push({n, b});
+  }
+  return list;
+}
+function lcSaveHist() { const k = "lc" + S.game, h = store(k) || []; h.unshift({t: Date.now(), s: L.sets.list}); store(k, h.slice(0, 10)); }
+function lcStart() {
+  if (L.busy) return;
+  const g = S.game, per = G[g].bonus ? 7 : 6;
+  if (L.mode === "step") {
+    if (!L.sets || L.shown >= per) { L.sets = {g, list: lcGen(g)}; L.shown = 0; }
+    L.shown++; beep(500 + L.shown * 80);
+    if (L.shown >= per) lcSaveHist();
+    renderCage(); return;
+  }
+  L.sets = {g, list: lcGen(g)}; L.shown = 0; L.busy = true; renderCage();
+  L.iv = setInterval(() => document.querySelectorAll(".cgb.spin").forEach(el => { el.textContent = pad(1 + Math.floor(rndU() * G[g].max)); }), 70);
+  for (let k = 0; k < per; k++) L.tm.push(setTimeout(() => {
+    L.shown = k + 1; beep(500 + k * 80);
+    if (k === per - 1) { clearInterval(L.iv); L.busy = false; lcSaveHist(); }
+    renderCage();
+  }, 500 + k * 280));
+}
+function renderCage() {
+  const g = S.game, per = G[g].bonus ? 7 : 6, cur = L.sets && L.sets.g === g ? L.sets.list : null, done = cur && L.shown >= per;
+  $("#cgTitle").textContent = `🎰 Lồng cầu — ${G[g].name}`;
+  $("#cgSnd").textContent = L.snd ? "🔊" : "🔇";
+  $("#cgModes").innerHTML = [["full", "⚡ Quay full"], ["step", "🎯 Từng quả"]].map(([m, t]) => `<button class="mode" data-m="${m}" aria-pressed="${L.mode === m}">${t}</button>`).join("");
+  $("#cgDistinct").checked = L.distinct;
+  $("#cgLines").innerHTML = LC.map(([e, t], i) => {
+    const s = cur && cur[i], seq = s ? s.n.concat(s.b ? [s.b] : []) : [];
+    const balls = Array.from({length: per}, (_, k) => (k === 6 ? '<span class="plus">+</span>' : "") +
+      (s && k < L.shown ? ball(seq[k], (k === 6 ? "gold " : "") + "sm") : `<span class="ball sm plain cgb${L.busy ? " spin" : ""}">?</span>`)).join("");
+    const acts = done ? `<div class="flex"><button class="copy" data-nums="${s.n.map(pad).join(" ")}">📋 Copy</button><button class="copy" data-cgchk="${i}">🔍 Dò</button><button class="copy" data-cgfav="${i}">💾 Lưu</button></div>` : "";
+    return `<div class="cgl"><div class="lt">${e} Dãy ${i + 1} · ${t}</div><div class="balls" style="margin:6px 0 8px">${balls}</div>${acts}</div>`;
+  }).join("");
+  $("#cgGo").textContent = L.mode === "full" ? "🎰 QUAY 5 DÃY" : (!cur || done ? "🎯 QUAY QUẢ ĐẦU TIÊN" : `🎯 QUAY QUẢ ${L.shown + 1}/${per}`);
+  $("#cgGo").disabled = L.busy;
+  const h = store("lc" + g) || [];
+  $("#cgHistTitle").textContent = `Lịch sử (${h.length}/10)`;
+  $("#cgHist").innerHTML = h.length ? h.map(x => `<details><summary>${new Date(x.t).toLocaleString("vi")}</summary>${x.s.map((s, i) => `<div class="pc" style="font-size:14px">Dãy ${i + 1}: ${s.n.map(pad).join(" ")}${s.b ? " + " + pad(s.b) : ""}</div>`).join("")}</details>`).join("") : '<div class="hint">Chưa có lịch sử quay</div>';
+}
+
 /* ───────── Điều khiển chung ───────── */
 function setTab(t) {
   S.tab = t;
   document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
-  for (const k of ["check", "stats", "pred", "hist"]) $("#t-" + k).hidden = k !== t;
-  if (t === "check") renderPick(); if (t === "stats") renderStats(); if (t === "pred") renderPred(); if (t === "hist") renderHist();
+  for (const k of ["check", "stats", "pred", "hist", "cage"]) $("#t-" + k).hidden = k !== t;
+  if (t === "check") renderPick(); if (t === "stats") renderStats(); if (t === "pred") renderPred(); if (t === "hist") renderHist(); if (t === "cage") renderCage();
 }
 function setGame(g) {
-  S.game = g; S.mode = "main"; S.pick = []; S.tickets = store("tk" + g) || []; $("#checkRes").innerHTML = "";
+  lcStop(); L.sets = null; L.shown = 0; S.game = g; S.mode = "main"; S.pick = []; S.tickets = store("tk" + g) || []; $("#checkRes").innerHTML = "";
   document.querySelectorAll("#gp button").forEach(b => b.setAttribute("aria-pressed", b.dataset.g === g));
   renderTop(); setTab(S.tab);
 }
@@ -607,6 +686,16 @@ async function init() {
     if (f) { S.pick = (store("fav" + S.game) || [])[+f.dataset.fav].slice(); renderPick(); }
     if (x) { const k = "fav" + S.game, a = store(k) || []; a.splice(+x.dataset.delfav, 1); store(k, a); renderPick(); }
   });
+  $("#t-cage").addEventListener("click", e => {
+    const m = e.target.closest("[data-m]"), c = e.target.closest("[data-cgchk]"), f = e.target.closest("[data-cgfav]"), cur = L.sets && L.sets.list;
+    if (m && !L.busy) { L.mode = m.dataset.m; L.sets = null; L.shown = 0; renderCage(); }
+    if (e.target.closest("#cgGo")) lcStart();
+    if (e.target.closest("#cgSnd")) { L.snd = !L.snd; store("lcSnd", L.snd); renderCage(); }
+    if (e.target.closest("#cgClear")) { store("lc" + S.game, []); renderCage(); }
+    if (c && cur) { S.pick = cur[+c.dataset.cgchk].n.slice(); setTab("check"); }
+    if (f && cur) { const k = "fav" + S.game, a = store(k) || [], t = cur[+f.dataset.cgfav].n.slice().sort((x, y) => x - y); if (!a.some(x => x.join() === t.join())) a.push(t); store(k, a); toast("Đã lưu vào yêu thích"); }
+  });
+  $("#cgDistinct").onchange = e => { L.distinct = e.target.checked; };
   $("#fab").onclick = () => scrollTo({top: 0, behavior: "smooth"});
   setGame("655"); setTab("stats"); setPill();
   setInterval(renderLive, 1000);
