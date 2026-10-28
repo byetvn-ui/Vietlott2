@@ -358,12 +358,24 @@ def load_games():
 
 
 def build_data():
+    """Tạo data.js. Chỉ ghi lại file khi dữ liệu kỳ quay thật sự thay đổi
+    (tránh bot commit + dựng lại web liên tục chỉ vì dấu thời gian)."""
     with LOCK:
-        data = dict(games=load_games(), generated=now_vn().isoformat(timespec="seconds"))
+        games = load_games()
+        path = os.path.join(BASE, "data.js")
+        try:
+            with open(path, encoding="utf-8") as f:
+                old = json.loads(f.read().strip()[len("window.LOTTO_DATA="):].rstrip(";"))
+            if old.get("games") == games:
+                return False
+        except Exception:  # noqa  (chưa có file / file hỏng -> ghi mới)
+            pass
+        data = dict(games=games, generated=now_vn().isoformat(timespec="seconds"))
         tmp = os.path.join(BASE, "data.js.tmp")
         with open(tmp, "w", encoding="utf-8") as f:
             f.write("window.LOTTO_DATA=" + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";\n")
-        os.replace(tmp, os.path.join(BASE, "data.js"))
+        os.replace(tmp, path)
+        return True
 
 
 def api_payload():
