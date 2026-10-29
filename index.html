@@ -126,6 +126,7 @@ details{margin-top:14px}summary{cursor:pointer;font-weight:800;color:var(--red)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#22a35a;color:#fff;padding:12px 18px;border-radius:18px;font-weight:800;opacity:0;transition:.3s;pointer-events:none;z-index:20;max-width:92vw;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%)}
 .fab{position:fixed;right:16px;bottom:18px;width:54px;height:54px;border-radius:50%;border:0;background:linear-gradient(135deg,#e3262b,#ff5533);color:#fff;font-size:20px;box-shadow:0 8px 18px rgba(227,38,43,.4);cursor:pointer;z-index:10}
+.ball.hit{box-shadow:0 0 0 3px #ffc233}.ball.miss{opacity:.3}
 .xt{border:2px solid var(--line);border-radius:20px;padding:12px 14px;margin-bottom:12px}.xt>b{font-weight:900}
 .bars{display:flex;gap:6px;height:84px;margin-top:8px}.bars>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;font-size:12px;font-weight:700;color:var(--mute)}
 .bars i{display:block;width:100%;background:linear-gradient(180deg,#ffc233,#ff5a36);border-radius:6px 6px 0 0;min-height:2px}
@@ -217,14 +218,13 @@ body{background:#1b1411}
   <!-- DỰ ĐOÁN -->
   <div class="card" id="t-pred" hidden>
     <h2 id="prTitle"></h2>
-    <p class="hint">Chọn công thức, trang sẽ tính ra bộ số từ dữ liệu lịch sử. Tính năng giải trí thôi nha — xổ số là ngẫu nhiên, kỳ trước không ảnh hưởng kỳ sau! 😄</p>
-    <div class="row"><label for="predN">Số kỳ gần nhất:</label><input type="number" id="predN" min="5" value="20"><span class="hint" id="predOf" style="margin:0"></span></div>
+    <p class="hint">Bộ số được <b>cố định theo từng kỳ</b>: thoát ra vào lại vẫn y nguyên, chỉ đổi khi có kết quả mới. Giải trí thôi nha — xổ số là ngẫu nhiên, kỳ trước không ảnh hưởng kỳ sau! 😄</p>
     <div class="row"><label for="predM">Phương thức:</label><select id="predM"></select></div>
-    <button class="btn red" id="predBtn">✨ Dự đoán</button>
     <div class="hint" id="predDesc" style="margin-top:12px"></div>
     <div class="res" id="predRes"></div>
     <h2 style="font-size:18px;margin-top:22px">📋 Bảng dự đoán đủ phương pháp</h2>
     <table><thead><tr><th>Phương pháp</th><th>Bộ số</th></tr></thead><tbody id="predAll"></tbody></table>
+    <h2 style="font-size:18px;margin-top:22px">✅ Đối chiếu với kết quả</h2><div id="predRev"></div>
     <details><summary>Kiểm chứng ngược – các cách này có thật sự hiệu quả?</summary>
       <p class="hint" id="btSub"></p>
       <table><thead><tr><th>Phương pháp</th><th>Số trúng / kỳ</th><th>So với ngẫu nhiên</th></tr></thead><tbody id="bt"></tbody></table>
@@ -239,13 +239,13 @@ body{background:#1b1411}
   </div>
   <div class="card" id="t-cage" hidden>
     <div class="flex" style="justify-content:space-between"><h2 id="cgTitle" style="margin:0"></h2><button class="btn" id="cgSnd" aria-label="Âm thanh">🔇</button></div>
-    <p class="hint">5 dãy được bốc ngẫu nhiên <b>có trọng số theo thống kê</b> (mỗi dãy một cách: số nóng, lâu chưa ra, toàn thời gian, điểm tổng hợp, pha trộn). Giải trí thôi — bộ số nào cũng có cơ hội trúng như nhau! 😄</p>
+    <p class="hint">5 dãy được bốc <b>hoàn toàn ngẫu nhiên</b> bằng <code>crypto.getRandomValues</code> của trình duyệt (không dùng thống kê — phần thống kê nằm ở tab Dự đoán). Mỗi bộ số đều có cơ hội trúng như nhau! 😄</p>
     <div class="modes" id="cgModes"></div>
     <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:0"><input type="checkbox" id="cgDistinct"> 5 dãy không trùng số nào</label>
-    <div id="cgLines"></div>
+    <div id="cgLines"></div><div class="hint" id="cgNote"></div>
     <button class="btn red" id="cgGo" style="width:100%"></button>
     <div class="row" style="justify-content:space-between;margin:18px 0 0"><b id="cgHistTitle"></b><button class="chip" id="cgClear">Xóa</button></div>
-    <div id="cgHist"></div>
+    <div class="hint" id="cgSum"></div><div id="cgHist"></div>
   </div>
 
   <div class="foot">Nguồn dữ liệu: ketquadientoan.com (chính) và minhngoc.net.vn (dự phòng, đối chiếu chéo). Trang cá nhân phi thương mại, <b>không phải trang chính thức của Vietlott</b> — kết quả chính thức xem tại vietlott.vn. Chỉ dành cho người từ 18 tuổi; xổ số là ngẫu nhiên, hãy chơi có trách nhiệm.</div>
@@ -300,6 +300,7 @@ function renderLive() {
     return [`<div class="lc"><div class="lh"><span class="nm">${G[g].name}</span>
       <span class="dt">${wdOf(r.d)}, ${fmtDate(r.d)} ${r.d === today ? '<span class="badge new">Hôm nay</span>' : ""}</span></div>
       <div class="balls">${ballsHtml(r)}</div>
+      <div class="dt">${setInfo(r.n)}</div>
       <div class="dt">Jackpot${g === "655" ? " 1" : ""}: <b style="color:var(--ink)">${esc(r.j) || "—"}</b></div>
       <div class="nx"></div></div>`, nx];
   });
@@ -422,23 +423,52 @@ const METHODS = [
   ["rnd",  "Ngẫu nhiên thuần", "Bốc ngẫu nhiên hoàn toàn đều."]
 ];
 const setInfo = s => `Tổng ${s.reduce((a, b) => a + b, 0)} · ${s.filter(x => x % 2 === 0).length} chẵn / ${s.filter(x => x % 2).length} lẻ`;
-function renderPred() {
-  const g = S.game, rows = rowsOf(g), max = G[g].max;
-  const N = Math.max(5, Math.min(rows.length, +S.predN || 20));
-  $("#prTitle").textContent = `🎯 Dự đoán số — ${G[g].name}`;
-  $("#predOf").textContent = `/ ${vi(rows.length)} kỳ`;
-  $("#predM").innerHTML = METHODS.map(([k, n]) => `<option value="${k}" ${S.predM === k ? "selected" : ""}>${n}</option>`).join("");
-  const d = detMethods(rows, max, N);
-  const rnd = mulberry32((+rows[0].d.replace(/-/g, "") + S.seed * 7919) >>> 0);
-  const sets = {pos: d.pos, hot: d.hot, cold: d.cold, all: d.all, bal: d.bal,
+const PRED_N = 20;
+const hashSeed = str => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+// 7 bộ số cho kỳ kế tiếp: chỉ phụ thuộc dữ liệu đã có + ngày kỳ cuối => mở lại app vẫn y nguyên đến khi có kỳ mới
+function predSets(g, rows) {
+  const max = G[g].max, d = detMethods(rows, max, Math.min(PRED_N, rows.length)), rnd = mulberry32(hashSeed(g + rows[0].d));
+  return {pos: d.pos, hot: d.hot, cold: d.cold, all: d.all, bal: d.bal,
     wr: weightedPick(d.fN.map(x => x + 1), max, rnd), rnd: weightedPick(new Array(max + 1).fill(1), max, rnd)};
+}
+// dựng lại đúng bộ đã dự đoán TRƯỚC mỗi kỳ gần đây rồi đếm số trúng
+function predReview(g, K) {
+  const rows = rowsOf(g), out = [];
+  for (let t = 0; t < K && t + 60 < rows.length; t++) {
+    const sets = predSets(g, rows.slice(t + 1)), act = new Set(rows[t].n), hits = {};
+    for (const [k] of METHODS) hits[k] = sets[k].filter(x => act.has(x));
+    out.push({r: rows[t], sets, hits});
+  }
+  return out;
+}
+const pname = k => METHODS.find(x => x[0] === k)[1].replace(/ \(.*\)/, "");
+function renderReview(g) {
+  const rv = predReview(g, 10), el = $("#predRev");
+  if (!rv.length) { el.innerHTML = '<div class="hint">Chưa đủ dữ liệu để đối chiếu.</div>'; return; }
+  const last = rv[0], r = last.r, base = 36 / G[g].max;
+  const res = r.n.map(x => ball(x, "sm")).join("") + (r.b ? '<span class="plus">+</span>' + ball(r.b, "gold sm") : "");
+  const rowsH = METHODS.map(([k]) => `<tr><td><b>${pname(k)}</b></td><td><div class="flex" style="gap:5px">${last.sets[k].map(x => ball(x, "sm" + (r.n.includes(x) ? " hit" : " miss"))).join("")}</div><div class="pc">trúng ${last.hits[k].length}/6</div></td></tr>`).join("");
+  const sumH = METHODS.map(([k]) => { const tot = rv.reduce((a, x) => a + x.hits[k].length, 0), best = Math.max(...rv.map(x => x.hits[k].length));
+    return `<tr><td>${pname(k)}</td><td class="c">${tot}</td><td class="c">${(tot / rv.length).toFixed(2)}</td><td class="c">${best}</td></tr>`; }).join("");
+  el.innerHTML = `<div class="hint" style="margin:0 0 6px">Kết quả ${fmtDate(r.d)}:</div><div class="flex" style="gap:5px">${res}</div><div class="hint" style="margin:4px 0 10px">${setInfo(r.n)}</div>
+  <table><thead><tr><th>Phương pháp</th><th>Bộ đã dự đoán trước kỳ này</th></tr></thead><tbody>${rowsH}</tbody></table>
+  <div class="hint">Tổng hợp ${rv.length} kỳ gần nhất (chọn ngẫu nhiên kỳ vọng ≈ ${base.toFixed(2)} số/kỳ):</div>
+  <table><thead><tr><th>Phương pháp</th><th>Tổng</th><th>TB/kỳ</th><th>Cao nhất</th></tr></thead><tbody>${sumH}</tbody></table>`;
+}
+function renderPred() {
+  const g = S.game, rows = rowsOf(g), max = G[g].max, N = Math.min(PRED_N, rows.length);
+  $("#prTitle").textContent = `🎯 Dự đoán số — ${G[g].name}`;
+  $("#predM").innerHTML = METHODS.map(([k, n]) => `<option value="${k}" ${S.predM === k ? "selected" : ""}>${n}</option>`).join("");
+  const sets = predSets(g, rows);
   const m = METHODS.find(x => x[0] === S.predM), s = sets[S.predM];
-  $("#predDesc").textContent = m[2];
+  $("#predDesc").textContent = m[2] + ` (dựa trên ${N} kỳ gần nhất)`;
   $("#predRes").innerHTML = `<b style="font-size:18px">Bộ số gợi ý cho kỳ tiếp theo</b>
+    <div class="hint" style="margin:2px 0 6px">Cố định từ kết quả ${fmtDate(rows[0].d)}, chỉ đổi khi có kỳ mới.</div>
     <div class="balls">${s.map(n => ball(n)).join("")}</div>
     <div class="flex" style="justify-content:space-between"><span class="hint" style="margin:0">${setInfo(s)}</span>
     <span class="flex"><button class="copy" data-nums="${s.map(pad).join(" ")}">📋 Copy</button><button class="copy" id="toCheck">🔍 Dò bộ này</button></span></div>`;
   $("#predAll").innerHTML = METHODS.map(([k, n]) => `<tr><td><b>${n.replace(/ \(.*\)/, "")}</b><div class="pc">${setInfo(sets[k])}</div></td><td><div class="flex" style="gap:5px">${sets[k].map(x => ball(x, "sm")).join("")}</div></td></tr>`).join("");
+  renderReview(g);
 
   const ck = g + "|" + N + "|" + rows[0].d;
   if (!BT[ck]) {
@@ -510,37 +540,42 @@ function renderHist() {
   const g = S.game;
   $("#hsTitle").textContent = `🗂️ 20 kỳ gần nhất — ${G[g].name}`;
   $("#hsBody").innerHTML = rowsOf(g).slice(0, 20).map(r => `<tr><td style="white-space:nowrap;font-weight:800;font-size:14px">${wdOf(r.d)}<br>${fmtDate(r.d)}</td>
-    <td><div class="flex" style="gap:5px">${ballsHtml(r, "sm")}</div></td><td style="text-align:right;font-weight:800;font-size:14px;white-space:nowrap">${esc(r.j)}</td></tr>`).join("");
+    <td><div class="flex" style="gap:5px">${ballsHtml(r, "sm")}</div><div class="pc" style="font-size:13.5px">${setInfo(r.n)}</div></td><td style="text-align:right;font-weight:800;font-size:14px;white-space:nowrap">${esc(r.j)}</td></tr>`).join("");
 }
 
 /* ───────── Lồng cầu ───────── */
 const L = {mode: "full", distinct: false, sets: null, shown: 0, busy: false, snd: !!store("lcSnd"), tm: [], iv: 0};
-const LC = [["🔥", "Số nóng"], ["⏳", "Lâu chưa ra"], ["📚", "Toàn thời gian"], ["⚖️", "Điểm tổng hợp"], ["🔀", "Nóng + lâu chưa ra"]];
+const LC = [1, 2, 3, 4, 5];
 const rndU = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 let AC;
 function beep(f) { if (!L.snd) return; try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; g.gain.value = .05; o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + .06); } catch (e) {} }
 function lcStop() { L.tm.forEach(clearTimeout); L.tm = []; clearInterval(L.iv); L.busy = false; }
-function lcWeights(g) {
-  const rows = rowsOf(g), max = G[g].max, N = Math.max(5, Math.min(rows.length, +S.predN || 20));
-  const fN = new Array(max + 1).fill(0), fA = fN.slice(), gap = new Array(max + 1).fill(-1);
-  rows.forEach((r, i) => { for (const n of r.n) { fA[n]++; if (i < N) fN[n]++; if (gap[n] < 0) gap[n] = i; } });
-  for (let n = 1; n <= max; n++) if (gap[n] < 0) gap[n] = rows.length;
-  const a = zs(fN, max), b = zs(fA, max), c = zs(gap, max);
-  const sN = fN.reduce((x, y) => x + y, 0) + max, sG = gap.slice(1).reduce((x, y) => x + y, 0) + max;
-  const w = f => { const o = new Array(max + 1).fill(0); for (let n = 1; n <= max; n++) o[n] = f(n); return o; };
-  return [w(n => fN[n] + 1), w(n => gap[n] + 1), w(n => fA[n] + 1), w(n => Math.exp(.4 * a[n] + .3 * b[n] + .3 * c[n])), w(n => (fN[n] + 1) / sN + (gap[n] + 1) / sG)];
+// bốc số bằng crypto.getRandomValues (loại bỏ lệch modulo bằng rejection sampling)
+function rndInt(n) {
+  const lim = Math.floor(4294967296 / n) * n, a = new Uint32Array(1);
+  do { crypto.getRandomValues(a); } while (a[0] >= lim);
+  return a[0] % n;
+}
+function lcPick(max, k, ex) {
+  const pool = []; for (let n = 1; n <= max; n++) if (!ex.has(n)) pool.push(n);
+  const out = []; for (let i = 0; i < k; i++) out.push(pool.splice(rndInt(pool.length), 1)[0]);
+  return out.sort((a, b) => a - b);
 }
 function lcGen(g) {
-  const max = G[g].max, W = lcWeights(g), used = new Set(), list = [];
-  let bw = null;
-  if (G[g].bonus) { bw = new Array(max + 1).fill(1); rowsOf(g).forEach(r => { if (r.b) bw[r.b]++; }); }
+  const max = G[g].max, used = new Set(), list = [];
   for (let i = 0; i < 5; i++) {
-    const w = W[i].slice(); if (L.distinct) used.forEach(n => { w[n] = 0; });
-    const n = weightedPick(w, max, rndU); n.forEach(x => used.add(x));
-    let b = null; if (bw) { const w2 = bw.slice(); n.forEach(x => { w2[x] = 0; }); b = weightedPick(w2, max, rndU, 1)[0]; }
-    list.push({n, b});
+    const n = lcPick(max, 6, L.distinct ? used : new Set()); n.forEach(x => used.add(x));
+    list.push({n, b: G[g].bonus ? lcPick(max, 1, new Set(n))[0] : null});
   }
   return list;
+}
+const drawTs = d => { const [y, m, dd] = d.split("-").map(Number); return Date.UTC(y, m - 1, dd, 11, 0, 0); }; // 18:00 giờ VN
+// kỳ chính thức ĐẦU TIÊN sau thời điểm quay lồng cầu (chưa có trong dữ liệu -> null = đang chờ)
+function lcTarget(g, t) { let hit = null; for (const r of rowsOf(g)) { if (drawTs(r.d) > t) hit = r; else break; } return hit; }
+function lcReview(g, x) {
+  const r = lcTarget(g, x.t); if (!r) return null;
+  const act = new Set(r.n), hits = x.s.map(s => s.n.filter(v => act.has(v)).length);
+  return {r, act, hits, best: Math.max(...hits)};
 }
 function lcSaveHist() { const k = "lc" + S.game, h = store(k) || []; h.unshift({t: Date.now(), s: L.sets.list}); store(k, h.slice(0, 10)); }
 function lcStart() {
@@ -566,18 +601,28 @@ function renderCage() {
   $("#cgSnd").textContent = L.snd ? "🔊" : "🔇";
   $("#cgModes").innerHTML = [["full", "⚡ Quay full"], ["step", "🎯 Từng quả"]].map(([m, t]) => `<button class="mode" data-m="${m}" aria-pressed="${L.mode === m}">${t}</button>`).join("");
   $("#cgDistinct").checked = L.distinct;
-  $("#cgLines").innerHTML = LC.map(([e, t], i) => {
+  $("#cgLines").innerHTML = LC.map((_, i) => {
     const s = cur && cur[i], seq = s ? s.n.concat(s.b ? [s.b] : []) : [];
     const balls = Array.from({length: per}, (_, k) => (k === 6 ? '<span class="plus">+</span>' : "") +
       (s && k < L.shown ? ball(seq[k], (k === 6 ? "gold " : "") + "sm") : `<span class="ball sm plain cgb${L.busy ? " spin" : ""}">?</span>`)).join("");
     const acts = done ? `<div class="flex"><button class="copy" data-nums="${s.n.map(pad).join(" ")}">📋 Copy</button><button class="copy" data-cgchk="${i}">🔍 Dò</button><button class="copy" data-cgfav="${i}">💾 Lưu</button></div>` : "";
-    return `<div class="cgl"><div class="lt">${e} Dãy ${i + 1} · ${t}</div><div class="balls" style="margin:6px 0 8px">${balls}</div>${acts}</div>`;
+    return `<div class="cgl"><div class="lt">🎲 Dãy ${i + 1}</div><div class="balls" style="margin:6px 0 8px">${balls}</div>${acts}</div>`;
   }).join("");
+  { const nt = nextDraw(g, nowVN()); $("#cgNote").textContent = done ? `🔎 Bộ số này sẽ tự đối chiếu với kết quả kỳ ${WD[nt.getDay()]}, ${pad(nt.getDate())}/${pad(nt.getMonth() + 1)} 18:00 (xem ở Lịch sử bên dưới).` : ""; }
   $("#cgGo").textContent = L.mode === "full" ? "🎰 QUAY 5 DÃY" : (!cur || done ? "🎯 QUAY QUẢ ĐẦU TIÊN" : `🎯 QUAY QUẢ ${L.shown + 1}/${per}`);
   $("#cgGo").disabled = L.busy;
   const h = store("lc" + g) || [];
-  $("#cgHistTitle").textContent = `Lịch sử (${h.length}/10)`;
-  $("#cgHist").innerHTML = h.length ? h.map(x => `<details><summary>${new Date(x.t).toLocaleString("vi")}</summary>${x.s.map((s, i) => `<div class="pc" style="font-size:14px">Dãy ${i + 1}: ${s.n.map(pad).join(" ")}${s.b ? " + " + pad(s.b) : ""}</div>`).join("")}</details>`).join("") : '<div class="hint">Chưa có lịch sử quay</div>';
+  $("#cgHistTitle").textContent = `Lịch sử & đối chiếu (${h.length}/10)`;
+  const rvs = h.map(x => lcReview(g, x)), done2 = rvs.filter(Boolean), base = 36 / G[g].max;
+  const nLines = done2.reduce((a, v) => a + v.hits.length, 0), tot = done2.reduce((a, v) => a + v.hits.reduce((p, q) => p + q, 0), 0);
+  $("#cgSum").textContent = done2.length ? `Đã đối chiếu ${done2.length} lần quay (${nLines} dãy): trung bình trúng ${(tot / nLines).toFixed(2)}/6 số mỗi dãy — ngẫu nhiên kỳ vọng ≈ ${base.toFixed(2)}.` : "";
+  $("#cgHist").innerHTML = h.length ? h.map((x, i) => {
+    const rv = rvs[i], when = new Date(x.t).toLocaleString("vi");
+    const head = rv ? `${when} · kỳ ${fmtDate(rv.r.d)} · cao nhất ${rv.best}/6` : `${when} · ⏳ chờ kết quả kỳ tiếp theo`;
+    const res = rv ? `<div class="hint" style="margin:6px 0 4px">Kết quả ${fmtDate(rv.r.d)}:</div><div class="flex" style="gap:5px">${ballsHtml(rv.r, "sm")}</div><div class="hint" style="margin:4px 0 8px">${setInfo(rv.r.n)}</div>` : "";
+    const lines = x.s.map((s, k) => `<div class="flex" style="gap:5px;margin-top:6px">${s.n.map(v => ball(v, "sm" + (rv ? (rv.act.has(v) ? " hit" : " miss") : ""))).join("")}${s.b ? '<span class="plus">+</span>' + ball(s.b, "gold sm" + (rv && rv.r.b ? (s.b === rv.r.b ? " hit" : " miss") : "")) : ""}</div><div class="pc" style="font-size:13.5px">Dãy ${k + 1}${rv ? " · trúng " + rv.hits[k] + "/6" : ""} · ${setInfo(s.n)}</div>`).join("");
+    return `<details${i === 0 ? " open" : ""}><summary>${head}</summary>${res}${lines}</details>`;
+  }).join("") : '<div class="hint">Chưa có lịch sử quay</div>';
 }
 
 /* ───────── Điều khiển chung ───────── */
@@ -630,9 +675,13 @@ async function pull(manual) {
 function notifyTickets(gs) {
   const msgs = [];
   for (const g of gs) {
-    const r = rowsOf(g)[0], all = (store("tk" + g) || []).concat(store("fav" + g) || []);
-    if (!all.length) continue;
-    msgs.push(`${G[g].name}: vé đã lưu trúng tối đa ${Math.max(...all.map(t => r.n.filter(x => t.includes(x)).length))}/6 số`);
+    const parts = [], rv = predReview(g, 1)[0], r = rowsOf(g)[0], all = (store("tk" + g) || []).concat(store("fav" + g) || []);
+    if (rv) { const best = Math.max(...METHODS.map(([k]) => rv.hits[k].length)), nm = METHODS.filter(([k]) => rv.hits[k].length === best).map(([k]) => pname(k));
+      parts.push(`dự đoán trúng cao nhất ${best}/6 (${nm[0]}${nm.length > 1 ? " +" + (nm.length - 1) : ""})`); }
+    if (all.length) parts.push(`vé đã lưu trúng tối đa ${Math.max(...all.map(t => r.n.filter(x => t.includes(x)).length))}/6`);
+    let lb = -1; for (const x of (store("lc" + g) || [])) { const rv = lcReview(g, x); if (rv && rv.r.d === r.d) lb = Math.max(lb, rv.best); }
+    if (lb >= 0) parts.push(`lồng cầu trúng cao nhất ${lb}/6`);
+    if (parts.length) msgs.push(`${G[g].name}: ${parts.join(", ")}`);
   }
   if (msgs.length) setTimeout(() => toast("🎫 " + msgs.join(" | ")), 7000);
 }
@@ -660,9 +709,7 @@ async function init() {
   $("#range").onchange = e => { S.range = e.target.value; renderStats(); };
   $("#sort").onchange = e => { S.sort = e.target.value; renderStats(); };
   $("#modes").onclick = e => { const b = e.target.closest(".mode"); if (b) { S.mode = b.dataset.m; renderStats(); } };
-  $("#predN").onchange = e => { S.predN = e.target.value; renderPred(); };
   $("#predM").onchange = e => { S.predM = e.target.value; renderPred(); };
-  $("#predBtn").onclick = () => { S.seed++; renderPred(); };
   document.addEventListener("click", async e => {
     const c = e.target.closest(".copy[data-nums]");
     if (c) { try { await navigator.clipboard.writeText(c.dataset.nums); toast("Đã copy: " + c.dataset.nums); } catch (_) { toast("Không copy được: " + c.dataset.nums, true); } }
