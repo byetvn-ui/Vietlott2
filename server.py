@@ -178,6 +178,52 @@ def prepend_ods(g, row):
     os.replace(tmp, path)
 
 
+def update_ods_jackpot(g, iso_date, jack):
+    """Điền/sửa ô jackpot (cột 3) của kỳ `iso_date` đã có trong .ods. True nếu đã sửa."""
+    path = ods_path(g)
+    d = date.fromisoformat(iso_date)
+    needle = d.strftime("%d/%m/%Y")
+    with zipfile.ZipFile(path) as zin:
+        content = zin.read("content.xml").decode("utf-8")
+        for m in re.finditer(r"<table:table-row\b.*?</table:table-row>", content, re.S):
+            row = m.group(0)
+            ps = list(re.finditer(r"<text:p>.*?</text:p>", row, re.S))
+            if len(ps) != 3 or needle not in re.sub(r"<[^>]+>", "", ps[0].group(0)):
+                continue
+            if re.sub(r"<[^>]+>", "", ps[2].group(0)).strip() == jack:
+                return False
+            new_row = row[:ps[2].start()] + "<text:p>%s</text:p>" % _esc(jack) + row[ps[2].end():]
+            new_content = content[:m.start()] + new_row + content[m.end():]
+            fd, tmp = tempfile.mkstemp(suffix=".ods", dir=DATA_DIR)
+            os.close(fd)
+            try:
+                with zipfile.ZipFile(tmp, "w") as zout:
+                    for item in zin.infolist():
+                        data = new_content.encode("utf-8") if item.filename == "content.xml" else zin.read(item.filename)
+                        zout.writestr(item, data, compress_type=item.compress_type)
+            except Exception:
+                os.remove(tmp)
+                raise
+            zin.close()
+            os.replace(tmp, path)
+            return True
+    return False
+
+
+def backfill_jackpots(g, res):
+    """Kết quả thường có trước, tiền jackpot các trang nguồn cập nhật chậm hơn:
+    điền bổ sung jackpot cho vài kỳ gần nhất đang để trống."""
+    fixed = 0
+    for r in read_ods(g)[:5]:
+        if r["j"]:
+            continue
+        j = next((s[r["d"]]["j"] for s in res.values() if r["d"] in s and s[r["d"]].get("j")), "")
+        if j and update_ods_jackpot(g, r["d"], j):
+            fixed += 1
+            log("%s: điền jackpot kỳ %s = %s" % (GAMES[g]["name"], r["d"], j))
+    return fixed
+
+
 # ───────────────────────── Lấy dữ liệu từ web ─────────────────────────
 
 ROW_RE = re.compile(
@@ -324,13 +370,17 @@ def sync(g):
                 log("%s: thêm kỳ %s  %s%s  %s  (%d nguồn)" % (
                     GAMES[g]["name"], row["d"], " ".join("%02d" % x for x in row["n"]),
                     (" + %02d" % row["b"]) if row["b"] else "", row["j"], len(vs)))
+            fixed = backfill_jackpots(g, res)
             if problem:
+                if fixed:
+                    build_data()
                 raise RuntimeError(problem)
             st["error"] = None
             st["last_ok"] = st["last_check"]
             st["last_added"] = added
             if added:
                 st["new_at"] = st["last_check"]
+            if added or fixed:
                 build_data()
             return added
         except Exception as e:  # noqa

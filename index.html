@@ -313,7 +313,7 @@ function renderLive() {
       <span class="dt">${wdOf(r.d)}, ${fmtDate(r.d)} ${r.d === today ? '<span class="badge new">Hôm nay</span>' : ""}</span></div>
       <div class="balls">${ballsHtml(r)}</div>
       <div class="dt">${setInfo(r.n)}</div>
-      <div class="dt">Jackpot${g === "655" ? " 1" : ""}: <b style="color:var(--ink)">${esc(r.j) || "—"}</b></div>
+      <div class="dt">Jackpot${g === "655" ? " 1" : ""}: <b style="color:var(--ink)">${esc(r.j) || (Date.now() - drawTs(r.d) < 36 * 3600e3 ? "⏳ đang cập nhật…" : "—")}</b></div>
       <div class="nx"></div></div>`, nx];
   });
   const shell = parts.map(x => x[0]).join("");
@@ -470,7 +470,7 @@ function renderReview(g) {
 }
 function renderPred() {
   const g = S.game, rows = rowsOf(g), max = G[g].max, N = Math.min(getN(), rows.length);
-  $("#predN").value = getN(); $("#predOf").textContent = `/ ${rows.length} kỳ`;
+  if (document.activeElement !== $("#predN")) $("#predN").value = getN(); $("#predOf").textContent = `/ ${rows.length} kỳ`;
   $("#prTitle").textContent = `🎯 Dự đoán số — ${G[g].name}`;
   $("#predM").innerHTML = METHODS.map(([k, n]) => `<option value="${k}" ${S.predM === k ? "selected" : ""}>${n}</option>`).join("");
   const sets = predSets(g, rows);
@@ -640,7 +640,7 @@ function renderCage() {
 }
 
 /* ───────── Lồng cầu hard: bốc ngẫu nhiên CÓ TRỌNG SỐ theo thống kê ───────── */
-const LH = {mode: "full", distinct: false, sets: null, shown: 0, busy: false, tm: [], iv: 0};
+const LH = {mode: "full", distinct: false, sets: null, shown: 0, busy: false, snd: !!store("lcSnd"), tm: [], iv: 0};
 const LCH = [["🔥", "Số nóng"], ["⏳", "Lâu chưa ra"], ["📚", "Toàn thời gian"], ["⚖️", "Điểm tổng hợp"], ["🔀", "Nóng + lâu chưa ra"]];
 function lhWeights(g) {
   const rows = rowsOf(g), max = G[g].max, N = Math.max(5, Math.min(rows.length, getN()));
@@ -686,7 +686,7 @@ function lhStart() {
 function renderCageH() {
   const g = S.game, per = G[g].bonus ? 7 : 6, cur = LH.sets && LH.sets.g === g ? LH.sets.list : null, done = cur && LH.shown >= per;
   $("#chTitle").textContent = `🧠 Lồng cầu hard — ${G[g].name}`;
-  $("#chSnd").textContent = L.snd ? "🔊" : "🔇";
+  $("#chSnd").textContent = LH.snd ? "🔊" : "🔇";
   $("#chModes").innerHTML = [["full", "⚡ Quay full"], ["step", "🎯 Từng quả"]].map(([m, t]) => `<button class="mode" data-m="${m}" aria-pressed="${LH.mode === m}">${t}</button>`).join("");
   $("#chDistinct").checked = LH.distinct;
   $("#chLines").innerHTML = LCH.map(([e, t], i) => {
@@ -797,7 +797,11 @@ async function init() {
   $("#range").onchange = e => { S.range = e.target.value; renderStats(); };
   $("#sort").onchange = e => { S.sort = e.target.value; renderStats(); };
   $("#modes").onclick = e => { const b = e.target.closest(".mode"); if (b) { S.mode = b.dataset.m; renderStats(); } };
-  $("#predN").onchange = e => { store("predN", Math.max(5, Math.min(200, Math.round(+e.target.value) || PRED_N))); renderPred(); };
+  // Số kỳ: áp dụng khi gõ xong (0,6s) hoặc rời ô; không vẽ lại nếu giá trị không đổi (tránh mất cú bấm nút ngay sau khi gõ)
+  let nTimer = 0;
+  const applyN = el => { const v = Math.max(5, Math.min(200, Math.round(+el.value) || PRED_N)); if (v !== getN()) { store("predN", v); renderPred(); } else if (document.activeElement !== el) el.value = v; };
+  $("#predN").oninput = e => { clearTimeout(nTimer); const v = Math.round(+e.target.value); if (v >= 5 && v <= 200) nTimer = setTimeout(() => applyN(e.target), 600); };
+  $("#predN").onchange = e => { clearTimeout(nTimer); applyN(e.target); };
   $("#predM").onchange = e => { S.predM = e.target.value; renderPred(); };
   document.addEventListener("click", async e => {
     const c = e.target.closest(".copy[data-nums]");
@@ -836,7 +840,7 @@ async function init() {
     const m = e.target.closest("[data-m]"), c = e.target.closest("[data-chchk]"), f = e.target.closest("[data-chfav]"), cur = LH.sets && LH.sets.list;
     if (m && !LH.busy) { LH.mode = m.dataset.m; LH.sets = null; LH.shown = 0; renderCageH(); }
     if (e.target.closest("#chGo")) lhStart();
-    if (e.target.closest("#chSnd")) { L.snd = !L.snd; store("lcSnd", L.snd); renderCageH(); }
+    if (e.target.closest("#chSnd")) { LH.snd = !LH.snd; store("lcSnd", LH.snd); renderCageH(); }
     if (e.target.closest("#chClear")) { store("lh" + S.game, []); renderCageH(); }
     if (c && cur) { S.pick = cur[+c.dataset.chchk].n.slice(); setTab("check"); }
     if (f && cur) { const k = "fav" + S.game, a = store(k) || [], t = cur[+f.dataset.chfav].n.slice().sort((x, y) => x - y); if (!a.some(x => x.join() === t.join())) a.push(t); store(k, a); toast("Đã lưu vào yêu thích"); }
