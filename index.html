@@ -221,7 +221,7 @@ body{background:#1b1411}
   <div class="card" id="t-pred" hidden>
     <h2 id="prTitle"></h2>
     <p class="hint">Bộ số được <b>cố định theo từng kỳ</b>: thoát ra vào lại vẫn y nguyên, chỉ đổi khi có kết quả mới hoặc khi bạn đổi số kỳ bên dưới (số kỳ được nhớ lại trên máy). Giải trí thôi nha — xổ số là ngẫu nhiên, kỳ trước không ảnh hưởng kỳ sau! 😄</p>
-    <div class="row"><label for="predN">Số kỳ gần nhất:</label><input type="number" id="predN" min="5" max="200" value="20"><span class="hint" id="predOf" style="margin:0"></span></div>
+    <div class="row"><label for="predN">Số kỳ gần nhất:</label><input type="number" id="predN" min="5" value="20"><button class="chip" id="predAllBtn" type="button">Tất cả</button><span class="hint" id="predOf" style="margin:0"></span></div>
     <div class="row"><label for="predM">Phương thức:</label><select id="predM"></select></div>
     <div class="hint" id="predDesc" style="margin-top:12px"></div>
     <div class="res" id="predRes"></div>
@@ -439,7 +439,7 @@ const METHODS = [
 ];
 const setInfo = s => `Tổng ${s.reduce((a, b) => a + b, 0)} · ${s.filter(x => x % 2 === 0).length} chẵn / ${s.filter(x => x % 2).length} lẻ`;
 const PRED_N = 20;
-const getN = () => Math.max(5, Math.min(200, Math.round(+store("predN")) || PRED_N));
+const getN = () => Math.max(5, Math.min(100000, Math.round(+store("predN")) || PRED_N));
 const hashSeed = str => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 // 7 bộ số cho kỳ kế tiếp: chỉ phụ thuộc dữ liệu đã có + ngày kỳ cuối => mở lại app vẫn y nguyên đến khi có kỳ mới
 function predSets(g, rows, N = getN()) {
@@ -473,7 +473,7 @@ function renderReview(g) {
 }
 function renderPred() {
   const g = S.game, rows = rowsOf(g), max = G[g].max, N = Math.min(getN(), rows.length);
-  if (document.activeElement !== $("#predN")) $("#predN").value = getN(); $("#predOf").textContent = `/ ${rows.length} kỳ`;
+  if (document.activeElement !== $("#predN")) $("#predN").value = N; $("#predOf").textContent = `/ ${rows.length} kỳ`;
   $("#prTitle").textContent = `🎯 Dự đoán số — ${G[g].name}`;
   $("#predM").innerHTML = METHODS.map(([k, n]) => `<option value="${k}" ${S.predM === k ? "selected" : ""}>${n}</option>`).join("");
   const sets = predSets(g, rows);
@@ -833,9 +833,10 @@ async function init() {
   $("#modes").onclick = e => { const b = e.target.closest(".mode"); if (b) { S.mode = b.dataset.m; renderStats(); } };
   // Số kỳ: áp dụng khi gõ xong (0,6s) hoặc rời ô; không vẽ lại nếu giá trị không đổi (tránh mất cú bấm nút ngay sau khi gõ)
   let nTimer = 0;
-  const applyN = el => { const v = Math.max(5, Math.min(200, Math.round(+el.value) || PRED_N)); if (v !== getN()) { store("predN", v); renderPred(); } else if (document.activeElement !== el) el.value = v; };
-  $("#predN").oninput = e => { clearTimeout(nTimer); const v = Math.round(+e.target.value); if (v >= 5 && v <= 200) nTimer = setTimeout(() => applyN(e.target), 600); };
-  $("#predN").onchange = e => { clearTimeout(nTimer); applyN(e.target); };
+  const applyN = el => { const v = Math.max(5, Math.min(100000, Math.round(+el.value) || PRED_N)); if (v !== Math.min(getN(), rowsOf(S.game).length)) { store("predN", v); renderPred(); } else if (document.activeElement !== el) el.value = v; };
+  $("#predN").oninput = e => { clearTimeout(nTimer); const v = Math.round(+e.target.value); if (v >= 5) nTimer = setTimeout(() => applyN(e.target), 600); };
+  $("#predN").onchange = e => { clearTimeout(nTimer); applyN(e.target); e.target.value = Math.min(getN(), rowsOf(S.game).length); };
+  $("#predAllBtn").onclick = () => { store("predN", 100000); renderPred(); };
   $("#predM").onchange = e => { S.predM = e.target.value; renderPred(); };
   document.addEventListener("click", async e => {
     const c = e.target.closest(".copy[data-nums]");
