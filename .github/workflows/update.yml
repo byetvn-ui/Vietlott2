@@ -2,8 +2,8 @@ name: Cập nhật kết quả
 
 on:
   schedule:
-    # 13:00-14:59 và 18:00-22:59 giờ VN (= 06-07 và 11-15 UTC), mỗi 5 phút, mọi ngày (5/35 quay cả Thứ Hai)
-    - cron: "*/5 6-7,11-15 * * *"
+    # 12:00-14:59 và 17:00-22:59 giờ VN (= 05-07 và 10-15 UTC), gồm chạy trước giờ quay để khóa dự đoán
+    - cron: "*/5 5-7,10-15 * * *"
     # kiểm tra bù 2 lần mỗi ngày
     - cron: "30 2,15 * * *"
   workflow_dispatch:
@@ -36,6 +36,19 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python3 analyze.py
+      - name: Analytics Engine — thống kê ba game
+        id: analytics
+        continue-on-error: true
+        run: python3 analytics.py
+      - name: Evaluation Engine — walk-forward và đối chứng ngẫu nhiên
+        id: evaluation
+        continue-on-error: true
+        run: python3 evaluation.py
+      - name: Prediction Engine — khóa 5 bộ và đối chiếu lịch sử
+        id: prediction
+        if: steps.sync.outcome == 'success'
+        continue-on-error: true
+        run: python3 prediction.py
       - name: Lưu thay đổi
         run: |
           git config user.name "vietlott-bot"
@@ -43,5 +56,5 @@ jobs:
           git add -A
           git diff --cached --quiet || (git commit -m "Cập nhật kết quả $(date -u +%F)" && git push)
       - name: Báo lỗi nếu thất bại
-        if: steps.sync.outcome == 'failure'
+        if: steps.sync.outcome == 'failure' || steps.analytics.outcome == 'failure' || steps.evaluation.outcome == 'failure' || steps.prediction.outcome == 'failure'
         run: exit 1
