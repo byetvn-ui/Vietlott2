@@ -13,6 +13,11 @@ class UIStructureTests(unittest.TestCase):
         self.assertEqual(tabs, ["check", "pred", "lab", "stats", "hist", "tools"])
         self.assertIn('id="t-lab"', html)
         self.assertNotIn('id="predictionLab"', html)
+        self.assertIn('id="labAssistant"', html)
+        self.assertIn('id="assistantQuestion"', html)
+        analytics = (ROOT / "analytics.js").read_text(encoding="utf-8")
+        self.assertIn('/api/assistant/status', analytics)
+        self.assertIn('/api/assistant', analytics)
         pred_start, lab_start = html.index('id="t-pred"'), html.index('id="t-lab"')
         self.assertLess(pred_start, lab_start)
         self.assertNotIn('id="t-lab"', html[pred_start:lab_start])
@@ -41,7 +46,7 @@ class UIStructureTests(unittest.TestCase):
         self.assertIn("table-scroll-hint", html)
         self.assertIn("table-scroll-hint", analytics)
         sw = (ROOT / "sw.js").read_text(encoding="utf-8")
-        self.assertIn('const C = "vietlott-v5"', sw)
+        self.assertIn('const C = "vietlott-v7"', sw)
 
 
 
