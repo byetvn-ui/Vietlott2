@@ -51,10 +51,39 @@ jobs:
         run: python3 prediction.py
       - name: Lưu thay đổi
         run: |
+          set -e
           git config user.name "vietlott-bot"
           git config user.email "bot@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || (git commit -m "Cập nhật kết quả $(date -u +%F)" && git push)
+          if git diff --cached --quiet; then
+            echo "Không có thay đổi để lưu."
+            exit 0
+          fi
+
+          git commit -m "Cập nhật kết quả $(date -u +%F)"
+
+          # Push có retry để xử lý trường hợp bot/commit khác cập nhật main cùng lúc.
+          # Không force-push; nếu cùng sửa một tệp gây conflict thì dừng an toàn.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "Đã push thành công ở lần thử ${attempt}."
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Push thất bại sau 3 lần thử."
+              exit 1
+            fi
+
+            echo "Remote main đã thay đổi hoặc push tạm thời thất bại; fetch/rebase rồi thử lại (${attempt}/3)."
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "::error::Rebase có conflict. Đã dừng để tránh ghi đè dữ liệu trên main."
+              exit 1
+            fi
+            sleep 2
+          done
       - name: Báo lỗi nếu thất bại
         if: steps.sync.outcome == 'failure' || steps.analytics.outcome == 'failure' || steps.evaluation.outcome == 'failure' || steps.prediction.outcome == 'failure'
         run: exit 1
