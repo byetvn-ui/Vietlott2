@@ -57,6 +57,16 @@ class ODSIntegrityTests(unittest.TestCase):
         self.assertEqual(set(report), {"655", "645", "535"})
         self.assertTrue(all(count > 0 for count in report.values()))
 
+    def test_legacy_prediction_metadata_has_append_only_correction(self):
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(base, "prediction_metadata_audit.jsonl")
+        with open(path, encoding="utf-8") as f:
+            events = [json.loads(line) for line in f if line.strip()]
+        event = next(e for e in events if e.get("prediction_id") == "dd36d0cd9905cd58dfd2")
+        self.assertEqual(event["original_value"], [1, 0])
+        self.assertEqual(event["corrected_value"], [1, 55])
+        self.assertTrue(event["immutable_prediction_log"])
+
     def test_source_parser_rejects_power_bonus_duplicate(self):
         invalid = "<div>T3, 24/11/2026 01 02 03 04 05 06 01</div>"
         valid = "<div>T3, 24/11/2026 01 02 03 04 05 06 07</div>"
@@ -76,6 +86,9 @@ class ODSIntegrityTests(unittest.TestCase):
             self.assertEqual(len(lines), 2)
             self.assertEqual(lines[0]["source_names"], ["source_a", "source_b"])
             self.assertEqual(lines[0]["outcome"], "success")
+            self.assertEqual(lines[0]["draw_checks"][0]["draw"], "draw-1")
+            self.assertTrue(lines[0]["draw_checks"][0]["agreement"])
+            self.assertEqual(len(lines[0]["draw_checks"][0]["source_fingerprints"]), 2)
             self.assertEqual(lines[1]["outcome"], "error")
 
 
