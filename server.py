@@ -274,6 +274,48 @@ ROW_RE = re.compile(
     r"(T[2-7]|CN)\s*,\s*(\d{2})/(\d{2})/(\d{4})(.*?)(?=(?:T[2-7]|CN)\s*,\s*\d{2}/\d{2}/\d{4}|\Z)", re.S)
 
 
+def valid_draw_numbers(g, nums):
+    """Validate the complete official number tuple for a game before accepting a source row."""
+    cfg = GAMES[g]
+    if not isinstance(nums, (list, tuple)) or len(nums) != cfg["main"] + (1 if cfg["bonus"] else 0):
+        return False
+    main = list(nums[:cfg["main"]])
+    if len(set(main)) != cfg["main"] or any(not isinstance(x, int) or not 1 <= x <= cfg["maxn"] for x in main):
+        return False
+    if cfg["bonus"]:
+        bonus = nums[cfg["main"]]
+        bmax = cfg.get("bmax", cfg["maxn"])
+        if not isinstance(bonus, int) or not 1 <= bonus <= bmax:
+            return False
+        # Power 6/55: số phụ phải thuộc 49 số còn lại; 5/35 cho phép trùng số chính.
+        if g == "655" and bonus in main:
+            return False
+    return True
+
+
+def validate_ods_data():
+    """Raise ValueError if any stored draw violates game rules or has an invalid date/key."""
+    report = {}
+    for game, cfg in GAMES.items():
+        rows = read_ods(game)
+        if not rows:
+            raise ValueError("%s: không có dữ liệu" % game)
+        keys = [rowkey(game, row) for row in rows]
+        if len(keys) != len(set(keys)) or keys != sorted(keys, reverse=True):
+            raise ValueError("%s: kỳ trùng hoặc sai thứ tự" % game)
+        for row in rows:
+            if not valid_draw_numbers(game, list(row["n"]) + ([row.get("b")] if cfg["bonus"] else [])):
+                raise ValueError("%s: bộ số sai luật tại kỳ %s" % (game, rowkey(game, row)))
+            try:
+                date.fromisoformat(row["d"])
+            except (TypeError, ValueError):
+                raise ValueError("%s: ngày không hợp lệ tại %r" % (game, row.get("d")))
+            if game == "535" and row.get("h") not in cfg["hours"]:
+                raise ValueError("535: giờ quay không hợp lệ tại kỳ %s" % rowkey(game, row))
+        report[game] = len(rows)
+    return report
+
+
 def parse_source(html_text, g):
     """Bóc các kỳ quay từ HTML của ketquadientoan.com. Chịu được nhiều kiểu markup (td/span/...)."""
     cfg = GAMES[g]
@@ -285,6 +327,10 @@ def parse_source(html_text, g):
     out, seen = [], set()
     for m in ROW_RE.finditer(t):
         iso = "%s-%s-%s" % (m.group(4), m.group(3), m.group(2))
+        try:
+            date.fromisoformat(iso)
+        except ValueError:
+            continue
         if iso in seen:
             continue
         seg = m.group(5)
@@ -293,7 +339,7 @@ def parse_source(html_text, g):
             continue
         ns = [int(x) for x in mm.group(1).split()]
         main = ns[:cfg["main"]]
-        if len(set(main)) != cfg["main"] or any(not 1 <= x <= cfg["maxn"] for x in ns):
+        if not valid_draw_numbers(g, ns):
             continue
         rest = seg[mm.end():]
         jm = re.search(r"≈\s*[\d.,]+\s*Tỷ", rest)
@@ -331,13 +377,17 @@ def parse_minhngoc(html_text, g):
     out, seen = [], set()
     for i, m in enumerate(ms):
         iso = "%s-%s-%s" % (m.group(3), m.group(2), m.group(1))
+        try:
+            date.fromisoformat(iso)
+        except ValueError:
+            continue
         seg = t[m.end(): ms[i + 1].start() if i + 1 < len(ms) else len(t)]
         nm = num_re.search(seg[:500])
         if iso in seen or not nm:
             continue
         ns = [int(x) for x in nm.group(1).split()]
         main = ns[:cfg["main"]]
-        if len(set(main)) != cfg["main"] or any(not 1 <= x <= cfg["maxn"] for x in ns):
+        if not valid_draw_numbers(g, ns):
             continue
         jm = re.search(r"Jackpot(?:\s*1)?\b.{0,60}?(\d{1,3}(?:[.,]\d{3}){2,})", seg[nm.end():], re.S)
         jack = jack_fmt(int(re.sub(r"\D", "", jm.group(1)))) if jm else ""
@@ -620,6 +670,45 @@ def gather(g):
     return res, errs
 
 
+def write_sync_audit(game, sources, errors, added, latest_before, outcome):
+    """Append-only operational audit; source names/counts are recorded, never credentials or HTML."""
+    path = os.path.join(BASE, "sync_audit.jsonl")
+    event = {
+        "timestamp": now_vn().isoformat(timespec="seconds"),
+        "game": game,
+        "outcome": outcome,
+        "latest_before": latest_before or None,
+        "sources": {name: len(rows) for name, rows in (sources or {}).items()},
+        "source_names": sorted((sources or {}).keys()),
+        "errors": list(errors or []),
+        "draws_added": int(added or 0),
+    }
+    try:
+        # Tránh tạo commit mới mỗi 5 phút khi bot chỉ kiểm tra mà không có thay đổi.
+        signature = (event["game"], event["outcome"], event["latest_before"],
+                     event["sources"], event["errors"], event["draws_added"])
+        try:
+            with open(path, "rb") as existing:
+                existing.seek(0, os.SEEK_END)
+                size = existing.tell()
+                if size:
+                    pos = max(0, size - 8192)
+                    existing.seek(pos)
+                    tail = existing.read().decode("utf-8", errors="replace").splitlines()
+                    if tail:
+                        previous = json.loads(tail[-1])
+                        previous_signature = (previous.get("game"), previous.get("outcome"), previous.get("latest_before"),
+                                              previous.get("sources"), previous.get("errors"), previous.get("draws_added"))
+                        if previous_signature == signature:
+                            return
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+    except OSError as exc:
+        log("Không ghi được sync audit %s: %s" % (game, exc))
+
+
 def sync(g):
     """Lấy từ nhiều nguồn, đối chiếu chéo rồi mới ghi kỳ mới vào .ods. Trả về số kỳ đã thêm.
     Ghi ngay khi >=2 nguồn khớp nhau; nếu mới có 1 nguồn thì chờ 45 phút sau giờ quay rồi mới tin.
@@ -628,6 +717,7 @@ def sync(g):
         st = STATUS[g]
         LAST_TRY[g] = time.time()
         st["last_check"] = now_vn().isoformat(timespec="seconds")
+        res, errs, added, latest = {}, [], 0, ""
         try:
             local = read_ods(g)
             latest = rowkey(g, local[0]) if local else ""
@@ -680,9 +770,12 @@ def sync(g):
                 note("💰 %s: đã bổ sung jackpot cho %d kỳ" % (GAMES[g]["name"], fixed))
             if added or fixed:
                 build_data()
+            if added or fixed:
+                write_sync_audit(g, res, errs, added, latest, "success")
             return added
         except Exception as e:  # noqa
             st["error"] = "%s: %s" % (type(e).__name__, e)
+            write_sync_audit(g, res, errs + [st["error"]], added, latest, "error")
             log("%s: LỖI %s" % (GAMES[g]["name"], st["error"]))
             return 0
 
@@ -819,8 +912,13 @@ def main():
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--sync-once", action="store_true")
     ap.add_argument("--build", action="store_true")
+    ap.add_argument("--validate-data", action="store_true", help="kiểm tra toàn vẹn ODS của cả ba game")
     a = ap.parse_args()
 
+    if a.validate_data:
+        report = validate_ods_data()
+        print("Dữ liệu hợp lệ:", report)
+        return
     if a.build:
         build_data()
         print("Đã tạo data.js")

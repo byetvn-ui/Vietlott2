@@ -208,7 +208,7 @@ def main():
             "algorithm_version":ALGORITHM_VERSION,"seed":seed,
             "parameters":{"window":min(20,len(rows)),"ticket_count":5,"max_pair_overlap":diversity["max_pair_overlap"],
                           "candidate_pool_per_strategy":320,"main_number_range":[1,server.GAMES[game]["maxn"]],
-                          "special_range":[1,server.GAMES[game].get("bmax",0)] if server.GAMES[game]["bonus"] else None},
+                          "special_range":[1,server.GAMES[game].get("bmax",server.GAMES[game]["maxn"])] if server.GAMES[game]["bonus"] else None},
             "diversity":diversity,"tickets":tickets,
             "disclaimer":"Các kỳ quay độc lập; đa dạng hóa chỉ giảm trùng lặp giữa vé, không tăng xác suất của một vé."
         })

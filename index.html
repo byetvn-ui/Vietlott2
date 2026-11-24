@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Thống kê Vietlott 6/45 &amp; 6/55</title>
-<meta name="description" content="Kết quả, thống kê và dò số Vietlott Mega 6/45 & Power 6/55, tự cập nhật sau mỗi kỳ quay.">
+<title>Vietlott2 – Dò số, dự đoán &amp; thống kê 6/55 · 6/45 · 5/35</title>
+<meta name="description" content="Kết quả, dò số, dự đoán và thống kê Vietlott Power 6/55, Mega 6/45 và Lotto 5/35.">
 <meta name="theme-color" content="#efe3cc" id="metaTheme">
 <script>try{var t=localStorage.getItem("theme");t=t&&JSON.parse(t);if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
-<meta property="og:title" content="Thống kê Vietlott 6/45 & 6/55"><meta property="og:type" content="website">
-<meta property="og:description" content="Kết quả mới nhất, thống kê tần suất, dò số 6/45 & 6/55.">
+<meta property="og:title" content="Vietlott2 – 6/55 · 6/45 · 5/35"><meta property="og:type" content="website">
+<meta property="og:description" content="Kết quả mới nhất, thống kê tần suất, dò số và dự đoán ba game Vietlott.">
 <link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -434,6 +434,33 @@ td .ball{width:29px;height:29px;font-size:11.5px}
 @media(prefers-reduced-motion:reduce){.ttwin svg{animation:none}}
 .themebtn{width:36px;height:30px;border-radius:8px;border:2px solid var(--line);background:var(--paper);color:var(--ink);font-size:16px;line-height:1;cursor:pointer;padding:0}
 .top .tr{display:flex;gap:8px;align-items:center}
+
+/* Vietlott2 2.0 – hierarchy, compact density and touch-first navigation */
+:root{--card-radius:20px;--card-pad:16px}
+.card{border-width:1px;border-radius:var(--card-radius);padding:var(--card-pad);box-shadow:0 3px 12px rgba(120,65,25,.055)}
+.tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:6px 0 12px}
+.tab{min-height:58px;border-radius:16px;padding:8px 5px;font-size:14px;gap:2px}
+.tab .e{font-size:19px}
+.tab[aria-selected=true]{box-shadow:0 3px 8px rgba(230,161,0,.2)}
+.live{gap:9px}.lc{border-width:1px;border-radius:16px;padding:11px}
+.xt,.ticket,.pickbox{border-radius:16px}
+.densitybar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 0 10px}
+.density-toggle{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:7px 12px;font:800 13px "Nunito",sans-serif;cursor:pointer}
+.fold{border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.55);padding:11px 13px;margin:10px 0}
+.fold>summary{font-weight:900;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.fold>summary::-webkit-details-marker{display:none}.fold>summary:after{content:"＋";color:var(--red);font-weight:900}.fold[open]>summary:after{content:"−"}
+.fold[open]>summary{margin-bottom:10px}
+.info-fold{display:inline-block;border:0;background:transparent;padding:0 4px;color:var(--red)}
+.info-fold>summary{font-size:18px;cursor:pointer;list-style:none}.info-fold>summary::-webkit-details-marker{display:none}
+.info-fold .info-copy{font-size:13px;color:var(--mute);max-width:520px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.tool-switch{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.tool-switch button{flex:1;min-width:100px}
+body[data-density="compact"] .card{margin-bottom:12px}
+body[data-density="compact"] .hint{font-size:13.5px}
+body[data-density="compact"] .note{font-size:13px}
+@media(max-width:420px){.app{padding:12px 10px 82px}.card{padding:13px}.tab{min-height:54px;font-size:13px}.tabs{gap:6px}.ball{width:38px;height:38px;font-size:15px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
 </style>
 </head>
 <body>
@@ -463,14 +490,14 @@ td .ball{width:29px;height:29px;font-size:11.5px}
     <div class="live" id="live"></div>
   </div>
 
-  <nav class="tabs" id="tabs">
+  <div class="densitybar"><span class="hint" style="margin:0">Hiển thị</span><button class="density-toggle" id="densityToggle" type="button" aria-pressed="false">Gọn · Đầy đủ</button></div>
+  <nav class="tabs" id="tabs" aria-label="Điều hướng chính">
     <button class="tab" data-t="check"><span class="e">🔍</span>Dò số</button>
-    <button class="tab" data-t="stats"><span class="e">📊</span>Thống kê</button>
     <button class="tab" data-t="pred"><span class="e">🎯</span>Dự đoán</button>
+    <button class="tab" data-t="lab"><span class="e">🧪</span>Lab</button>
+    <button class="tab" data-t="stats"><span class="e">📊</span>Thống kê</button>
     <button class="tab" data-t="hist"><span class="e">🗂️</span>Kết quả</button>
-    <button class="tab" data-t="cage"><span class="e">🎰</span>Lồng cầu</button>
-    <button class="tab" data-t="cageh"><span class="e">🧠</span>Lồng cầu hard</button>
-    <button class="tab" data-t="tally"><span class="e">🏆</span>Bộ đếm trúng giải</button>
+    <button class="tab" data-t="tools"><span class="e">🧰</span>Công cụ</button>
   </nav>
 
   <!-- DÒ SỐ -->
@@ -515,31 +542,34 @@ td .ball{width:29px;height:29px;font-size:11.5px}
   <!-- DỰ ĐOÁN -->
   <div class="card" id="t-pred" hidden>
     <h2 id="prTitle"></h2>
-    <p class="hint">Bộ số được <b>cố định theo từng kỳ</b>: thoát ra vào lại vẫn y nguyên, chỉ đổi khi có kết quả mới hoặc khi bạn đổi số kỳ bên dưới (số kỳ được nhớ lại trên máy). Giải trí thôi nha — xổ số là ngẫu nhiên, kỳ trước không ảnh hưởng kỳ sau! 😄</p>
+    <div id="predOfficial" class="res"><p class="hint">Đang tải 5 bộ dự đoán đã khóa…</p></div>
+    <details class="fold secondary-detail"><summary>⚙️ Bộ dự đoán nghiên cứu trên trình duyệt</summary>
+    <p class="hint">Bộ số được <b>cố định theo từng kỳ</b>: thoát ra vào lại vẫn y nguyên, chỉ đổi khi có kết quả mới hoặc khi bạn đổi số kỳ bên dưới. Đây là nhóm phương pháp tham khảo, tách biệt với 5 bộ đã khóa bởi bot.</p>
     <div class="row"><label for="predN">Số kỳ gần nhất:</label><input type="number" id="predN" min="5" value="20"><button class="chip" id="predAllBtn" type="button">Tất cả</button><span class="hint" id="predOf" style="margin:0"></span></div>
     <div class="row"><label for="predM">Phương thức:</label><select id="predM"></select></div>
     <div class="hint" id="predDesc" style="margin-top:12px"></div>
     <div class="res" id="predRes"></div>
-    <h2 style="font-size:18px;margin-top:22px">📋 Bảng dự đoán đủ phương pháp</h2>
-    <table><thead><tr><th>Phương pháp</th><th>Bộ số</th></tr></thead><tbody id="predAll"></tbody></table>
-    <h2 style="font-size:18px;margin-top:22px">✅ Đối chiếu với kết quả</h2><div id="predRev"></div>
-    <details><summary>Kiểm chứng ngược – các cách này có thật sự hiệu quả?</summary>
+    <details class="fold"><summary>📋 Bảng dự đoán đủ phương pháp</summary>
+    <div style="overflow-x:auto"><table><thead><tr><th>Phương pháp</th><th>Bộ số</th></tr></thead><tbody id="predAll"></tbody></table></div></details>
+    <details class="fold"><summary>✅ Đối chiếu với kết quả</summary><div id="predRev"></div></details>
+    <details class="fold secondary-detail"><summary>🧮 Kiểm chứng ngược / backtest cũ</summary>
       <p class="hint" id="btSub"></p>
       <table><thead><tr><th>Phương pháp</th><th>TB số chính</th><th>≥2 số</th><th>≥3 số</th><th>≥4 số</th><th>Số phụ/ĐB</th><th>Cao nhất</th></tr></thead><tbody id="bt"></tbody></table>
     </details>
-    <div class="note"><b>Lưu ý thẳng thắn:</b> mỗi kỳ quay độc lập – mọi bộ số hợp lệ có xác suất trúng như nhau. Backtest cũ chỉ để tham khảo; xem AI Prediction Lab bên dưới để kiểm định walk-forward dài hạn, đối chứng mô phỏng và hiệu chỉnh đa kiểm định.</div>
+    <details class="info-fold"><summary aria-label="Giải thích về xác suất">ⓘ</summary><div class="info-copy">Mỗi kỳ quay độc lập; các phương pháp thống kê không làm tăng xác suất toán học của một vé.</div></details>
+    </details>
+  </div>
 
-    <div class="card" id="predictionLab" style="margin-top:18px">
-      <h2>🧪 AI Prediction Lab</h2>
-      <p class="hint">Bảng điều khiển thống kê, kiểm định và 5 bộ dự đoán đã được bot khóa trước giờ quay. Dữ liệu tính ở GitHub Actions; điện thoại chỉ đọc JSON.</p>
-      <div class="hint" id="labStatus">Đang tải dữ liệu Lab…</div>
-      <div id="labPrediction"></div>
-      <h3 style="font-size:17px;color:var(--red);margin:18px 0 8px">📊 Analytics Engine</h3>
-      <div id="labAnalytics" class="hint">Chưa có analytics.json.</div>
-      <h3 style="font-size:17px;color:var(--red);margin:18px 0 8px">🧮 Evaluation Engine</h3>
-      <div id="labEvaluation" class="hint">Chưa có evaluation.json.</div>
-      <p class="note"><b>Giới hạn khoa học:</b> các kỳ quay độc lập. Tần suất, chu kỳ, số lâu chưa ra và mô hình ensemble không làm tăng xác suất toán học của một vé. Giới hạn trùng giữa 5 vé chỉ tăng độ phủ danh mục vé, không tạo lợi thế dự báo.</p>
-    </div>
+  <!-- AI PREDICTION LAB: tách riêng khỏi trang Dự đoán -->
+  <div class="card" id="t-lab" hidden>
+    <h2>🧪 AI Prediction Lab</h2>
+    <p class="hint">Nơi xem 5 bộ đã khóa, phân tích dữ liệu và kiểm định hiệu quả. Dữ liệu nặng được tính ở GitHub Actions; điện thoại chỉ đọc JSON.</p>
+    <div class="hint" id="labStatus">Đang tải dữ liệu Lab…</div>
+    <div id="labPrediction"></div>
+    <details class="fold secondary-detail"><summary>📊 Analytics Engine · Phân tích dữ liệu</summary><div id="labAnalytics" class="hint">Chưa có analytics.json.</div></details>
+    <details class="fold secondary-detail"><summary>🧮 Evaluation Engine · Kiểm định</summary><div id="labEvaluation" class="hint">Chưa có evaluation.json.</div></details>
+    <details class="fold secondary-detail"><summary>📚 Lịch sử dự đoán đã khóa</summary><div id="labHistory" class="hint">Chưa có lịch sử dự đoán.</div></details>
+    <details class="fold"><summary>ℹ️ Giới hạn khoa học</summary><p class="hint">Các kỳ quay độc lập. Tần suất, chu kỳ, số lâu chưa ra và mô hình ensemble không làm tăng xác suất toán học của một vé. Đa dạng hóa 5 vé chỉ làm tăng độ phủ danh mục, không tạo lợi thế dự báo.</p></details>
   </div>
 
   <!-- KẾT QUẢ -->
@@ -552,7 +582,16 @@ td .ball{width:29px;height:29px;font-size:11.5px}
     <table><tbody id="hsBody"></tbody></table>
     <div class="flex" style="margin-top:12px"><button class="chip" id="hsMore" type="button">⬇ Xem thêm 50 kỳ</button><button class="chip" id="hsAll" type="button">Hiện tất cả</button></div>
   </div>
-  <div class="card" id="t-cage" hidden>
+  <div class="card" id="t-tools" hidden>
+    <h2>🧰 Công cụ</h2>
+    <p class="hint">Các công cụ tạo số và theo dõi vé được gom tại đây để thanh điều hướng chính gọn hơn.</p>
+    <div class="tool-switch" id="toolSwitch">
+      <button class="btn" type="button" data-tool="cage">🎰 Lồng cầu</button>
+      <button class="btn" type="button" data-tool="cageh">🧠 Lồng cầu hard</button>
+      <button class="btn" type="button" data-tool="tally">🏆 Bộ đếm trúng giải</button>
+    </div>
+    <div id="tool-cage">
+  <div class="card" id="t-cage">
     <div class="flex" style="justify-content:space-between"><h2 id="cgTitle" style="margin:0"></h2><button class="btn" id="cgSnd" aria-label="Âm thanh">🔇</button></div>
     <p class="hint">5 dãy được bốc <b>hoàn toàn ngẫu nhiên</b> bằng <code>crypto.getRandomValues</code> của trình duyệt (không dùng thống kê — phần thống kê nằm ở tab Dự đoán). Mỗi bộ số đều có cơ hội trúng như nhau! 😄</p>
     <div class="modes" id="cgModes"></div>
@@ -562,7 +601,9 @@ td .ball{width:29px;height:29px;font-size:11.5px}
     <div class="row" style="justify-content:space-between;margin:18px 0 0"><b id="cgHistTitle"></b><button class="chip" id="cgClear">Xóa</button></div>
     <div class="hint" id="cgSum"></div><div id="cgHist"></div>
   </div>
-  <div class="card" id="t-cageh" hidden>
+    </div>
+    <div id="tool-cageh" hidden>
+  <div class="card" id="t-cageh">
     <div class="flex" style="justify-content:space-between"><h2 id="chTitle" style="margin:0"></h2><button class="btn" id="chSnd" aria-label="Âm thanh">🔇</button></div>
     <p class="hint">5 dãy bốc ngẫu nhiên <b>có trọng số theo thống kê</b> (mỗi dãy một cách: số nóng, lâu chưa ra, toàn thời gian, điểm tổng hợp, pha trộn; dùng số kỳ gần nhất đặt ở tab Dự đoán). Giải trí thôi — bộ số nào cũng có cơ hội trúng như nhau! 😄</p>
     <div class="modes" id="chModes"></div>
@@ -572,10 +613,14 @@ td .ball{width:29px;height:29px;font-size:11.5px}
     <div class="row" style="justify-content:space-between;margin:18px 0 0"><b id="chHistTitle"></b><button class="chip" id="chClear">Xóa</button></div>
     <div class="hint" id="chSum"></div><div id="chHist"></div>
   </div>
-  <div class="card" id="t-tally" hidden>
+    </div>
+    <div id="tool-tally" hidden>
+  <div class="card" id="t-tally">
     <h2 id="tlTitle" style="margin:0 0 6px"></h2>
     <p class="hint">Đếm số lần các bộ số trúng từng hạng giải (6/45 và 6/55 tính từ giải ba, 5/35 tính đủ cả giải khuyến khích). <b>Dự đoán</b> được dựng lại cho từng kỳ trong quá khứ; <b>Lồng cầu</b> và <b>Lồng cầu hard</b> cộng dồn các lần quay đã có kết quả; <b>vé</b> và <b>bộ yêu thích</b> đối chiếu toàn bộ lịch sử.</p>
     <div id="tlBody"></div>
+  </div>
+    </div>
   </div>
 
   <div style="text-align:center;margin:6px 0 10px"><button class="chip" id="reNotice">🔔 Xem lại đối chiếu kỳ mới nhất</button></div>
@@ -744,7 +789,7 @@ function jackpotCard(g) {
     return `<tr><td>${fmtDate(r.d)}${r.h ? " " + r.h + "h" : ""}</td><td>${esc(r.j) || "—"}</td><td>${w === null ? "—" : w > 0 ? "🎉 " + w : "0"}</td></tr>`;
   }).join("");
   const th = store("jpTh" + g) || "";
-  return `<div class="xt"><b>💰 Jackpot &amp; người trúng (15 kỳ gần nhất)</b>
+  return `<div class="xt"><b>Chi tiết Jackpot và số người trúng</b>
     <table style="margin-top:8px"><thead><tr><th>Kỳ</th><th>Jackpot</th><th>Trúng</th></tr></thead><tbody>${body}</tbody></table>
     <div class="row" style="margin-top:8px"><label for="jpTh">🔔 Báo khi jackpot ≥</label><input id="jpTh" type="number" min="0" inputmode="numeric" value="${th}" placeholder="tỷ đồng" style="width:90px"> tỷ</div></div>`;
 }
@@ -780,7 +825,10 @@ function renderExtra(g, sub, max) {
   <div class="xt"><b>➕ Tổng ${K} số</b><div class="pc">Trung bình ${avg} · 80% số kỳ nằm trong ${q(.1)}–${q(.9)}</div></div>
   <div class="xt"><b>🔗 Có số liền kề</b><div class="pc">${(cons / n * 100).toFixed(0)}% số kỳ có ít nhất 1 cặp số liền nhau (vd 17-18)</div></div>
   <div class="xt"><b>👫 Cặp hay đi cùng</b><div class="pc">${top.map(([k, c]) => `${pad(Math.floor(k / 100))}-${pad(k % 100)}: ${c} lần`).join(" · ")} — kỳ vọng mỗi cặp ≈ ${pe.toFixed(1)} lần</div></div>
-  ${spark ? `<div class="xt"><b>💰 Jackpot theo kỳ</b>${spark}</div>` : ""}${jackpotCard(g)}<div id="aiBox"></div>`;
+  <details class="fold secondary-detail"><summary>💰 Jackpot &amp; người trúng · 15 kỳ gần nhất</summary>
+  ${spark ? `<div class="xt"><b>Diễn biến Jackpot</b>${spark}</div>` : ""}${jackpotCard(g)}
+  </details><div id="aiBox"></div>`;
+  if (document.body.dataset.density === "full") el.querySelectorAll("details.secondary-detail").forEach(d => { d.open = true; });
   const thEl = $("#jpTh"); if (thEl) thEl.onchange = () => { store("jpTh" + g, thEl.value); renderBars(nowVN()); };
   aiCard(g).then(h => { const b = $("#aiBox"); if (b && S.game === g) b.innerHTML = h; });
 }
@@ -1234,11 +1282,27 @@ function renderTally() {
 }
 
 /* ───────── Điều khiển chung ───────── */
+function setTool(t) {
+  S.tool = ["cage", "cageh", "tally"].includes(t) ? t : (S.tool || "cage");
+  for (const k of ["cage", "cageh", "tally"]) $("#tool-" + k).hidden = k !== S.tool;
+  document.querySelectorAll("#toolSwitch [data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === S.tool));
+  if (S.tool === "cage") renderCage(); if (S.tool === "cageh") renderCageH(); if (S.tool === "tally") renderTally();
+}
+function setDensity(mode, announce = false) {
+  const density = mode === "full" ? "full" : "compact";
+  document.body.dataset.density = density;
+  store("uiDensity", density);
+  const b = $("#densityToggle");
+  if (b) { b.textContent = density === "compact" ? "Chế độ: Gọn" : "Chế độ: Đầy đủ"; b.setAttribute("aria-pressed", density === "full" ? "true" : "false"); }
+  document.querySelectorAll("details.secondary-detail").forEach(d => { if (density === "full") d.open = true; else d.open = false; });
+  if (announce) toast(density === "compact" ? "Đã bật chế độ Gọn" : "Đã bật chế độ Đầy đủ");
+}
 function setTab(t) {
   S.tab = t;
-  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
-  for (const k of ["check", "stats", "pred", "hist", "cage", "cageh", "tally"]) $("#t-" + k).hidden = k !== t;
-  if (t === "check") renderPick(); if (t === "stats") renderStats(); if (t === "pred") renderPred(); if (t === "hist") renderHist(); if (t === "cage") renderCage(); if (t === "cageh") renderCageH(); if (t === "tally") renderTally();
+  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t ? "true" : "false"));
+  for (const k of ["check", "stats", "pred", "hist", "lab", "tools"]) $("#t-" + k).hidden = k !== t;
+  if (t === "check") renderPick(); if (t === "stats") renderStats(); if (t === "pred") renderPred(); if (t === "hist") renderHist(); if (t === "tools") setTool(S.tool || "cage");
+  if (t === "lab" && window.VietlottLab) window.VietlottLab.refresh();
 }
 function setGame(g) {
   lcStop(); L.sets = null; L.shown = 0; lhStop(); LH.sets = null; LH.shown = 0; S.game = g; S.mode = "main"; S.pick = []; S.pickB = null; S.tickets = store("tk" + g) || []; $("#checkRes").innerHTML = "";
@@ -1450,6 +1514,8 @@ async function init() {
   checkJackpotRain();
   $("#gp").onclick = e => { const b = e.target.closest("button"); if (b) setGame(b.dataset.g); };
   $("#tabs").onclick = e => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.t); };
+  $("#densityToggle").onclick = () => setDensity(document.body.dataset.density === "full" ? "compact" : "full", true);
+  $("#toolSwitch").onclick = e => { const b = e.target.closest("[data-tool]"); if (b) setTool(b.dataset.tool); };
   $("#range").onchange = e => { S.range = e.target.value; renderStats(); };
   $("#sort").onchange = e => { S.sort = e.target.value; renderStats(); };
   $("#modes").onclick = e => { const b = e.target.closest(".mode"); if (b) { S.mode = b.dataset.m; renderStats(); } };
@@ -1521,7 +1587,8 @@ async function init() {
   $("#nclose").onclick = closeNotice; $("#reNotice").onclick = () => showNotice(true);
   $("#notif").onclick = e => { if (e.target.id === "notif") closeNotice(); };
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#notif").hidden) closeNotice(); });
-  setGame("655"); setTab("stats"); setPill();
+  setDensity(store("uiDensity") || "compact");
+  setGame("655"); setTab("check"); setPill();
   settleTally(); showNotice(false);
   setInterval(renderLive, 1000);
   if (serverMode) { $("#syncBtn").hidden = false; setInterval(() => pull(false), 20000); }

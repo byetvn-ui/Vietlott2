@@ -50,6 +50,17 @@
       ${result ? `<div class="badge new">Đã tự động đối chiếu kết quả</div>` : `<div class="badge wait">Đang chờ kết quả kỳ mục tiêu</div>`}
     </div>`;
   }
+  function renderHistory(events, game) {
+    const preds = events.filter(e => e.event_type === "prediction" && e.game === game).slice(-12).reverse();
+    const evals = new Map(events.filter(e => e.event_type === "evaluation").map(e => [e.prediction_id,e]));
+    if (!preds.length) return `<p class="hint">Chưa có dự đoán được khóa trong lịch sử.</p>`;
+    return preds.map((p,i) => {
+      const ev = evals.get(p.prediction_id);
+      const ticketCount = (p.tickets || []).length;
+      const hits = ev ? (ev.tickets || []).reduce((n,t)=>n+(t.main_hits||0),0) : null;
+      return `<div class="nrow"><b>${fmtDraw(p.target_draw)}</b> · ${ticketCount} vé · <span class="badge ${ev ? "new" : "wait"}">${ev ? "Đã đối chiếu" : "Đang chờ"}</span>${ev ? `<div class="pc">Tổng số chính trùng trên danh mục: ${hits}</div>` : ""}<div class="pc">Tạo lúc ${esc(p.created_at || "—")} · phiên bản ${esc(p.algorithm_version || "—")}</div></div>`;
+    }).join("");
+  }
   function renderAnalytics(data, game) {
     const g = data?.games?.[game];
     if (!g) return `<p>Chưa có thống kê cho game ${esc(game)}.</p>`;
@@ -87,15 +98,18 @@
       <p class="hint">${esc(g.interpretation || "")}</p>`;
   }
   async function refresh() {
-    const status=$("#labStatus"), pred=$("#labPrediction"), ana=$("#labAnalytics"), eva=$("#labEvaluation");
+    const status=$("#labStatus"), pred=$("#labPrediction"), ana=$("#labAnalytics"), eva=$("#labEvaluation"), hist=$("#labHistory");
     if (!status || !pred || !ana || !eva) return;
     const game=gameNow();
     try {
       const [events, analytics, evaluation] = await Promise.all([getLog(),get("analytics.json"),get("evaluation.json")]);
       status.textContent = `Đã tải dữ liệu Lab · game ${game} · ${new Date().toLocaleString("vi-VN")}`;
-      pred.innerHTML=renderPrediction(events,game);
+      const predictionHtml = renderPrediction(events,game);
+      pred.innerHTML=predictionHtml;
+      const official = $("#predOfficial"); if (official) official.innerHTML = predictionHtml;
       ana.innerHTML=renderAnalytics(analytics,game);
       eva.innerHTML=renderEvaluation(evaluation,game);
+      if (hist) hist.innerHTML=renderHistory(events,game);
     } catch (e) {
       status.textContent="Dữ liệu Lab đang chờ GitHub Actions chạy lần đầu hoặc chưa tạo đủ tệp.";
       if (!pred.innerHTML) pred.innerHTML=`<p class="hint">${esc(e.message)}</p>`;
@@ -108,5 +122,5 @@
   });
   document.addEventListener("DOMContentLoaded",refresh);
   setTimeout(refresh,1200);
-  setInterval(()=>{ if (!$("#t-pred")?.hidden) refresh(); },60000);
+  setInterval(()=>{ if (!$("#t-lab")?.hidden || !$("#t-pred")?.hidden) refresh(); },60000);
 })();
