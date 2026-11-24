@@ -31,6 +31,19 @@ class UIStructureTests(unittest.TestCase):
         for el in ("tool-cage", "tool-cageh", "tool-tally"):
             self.assertGreater(html.index(f'id="{el}"'), tools_start)
 
+    def test_mobile_data_tables_scroll_without_squeezing_columns(self):
+        html = (ROOT / "index.html").read_text(encoding="utf-8")
+        analytics = (ROOT / "analytics.js").read_text(encoding="utf-8")
+        self.assertIn(".table-scroll{width:100%;max-width:100%;overflow-x:auto", html)
+        self.assertIn(".table-scroll--wide table{min-width:720px}", html)
+        self.assertIn('aria-label="Bảng kết quả backtest"', html)
+        self.assertIn('aria-label="Bảng kiểm định các phương pháp"', analytics)
+        self.assertIn("table-scroll-hint", html)
+        self.assertIn("table-scroll-hint", analytics)
+        sw = (ROOT / "sw.js").read_text(encoding="utf-8")
+        self.assertIn('const C = "vietlott-v5"', sw)
+
+
 
 if __name__ == "__main__":
     unittest.main()
