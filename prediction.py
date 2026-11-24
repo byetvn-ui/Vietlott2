@@ -65,8 +65,16 @@ def _candidate_sets(game, rows, seed, count=320):
     nwin = min(20, len(rows))
     recent_counts = [0] + [sum(n in r["n"] for r in rows[:nwin]) for n in range(1, maximum + 1)]
     all_counts = [0] + [sum(n in r["n"] for r in rows) for n in range(1, maximum + 1)]
-    gap = [0] + [next((i for i, r in enumerate(rows) if n in r["n"]), len(rows))
-                 for n in range(1, maximum + 1)]
+    first_seen = {n: len(rows) for n in range(1, maximum + 1)}
+    unseen = set(first_seen)
+    for i, row in enumerate(rows):
+        for n in row["n"]:
+            if n in unseen:
+                first_seen[n] = i
+                unseen.remove(n)
+        if not unseen:
+            break
+    gap = [0] + [first_seen[n] for n in range(1, maximum + 1)]
     def z(a):
         vals = a[1:]
         mean = sum(vals) / maximum
@@ -92,10 +100,10 @@ def _candidate_sets(game, rows, seed, count=320):
     return pools, recent_counts, all_counts
 
 
-def build_five(game, rows, seed):
+def build_five(game, rows, seed, candidate_count=320):
     cfg = server.GAMES[game]
     maximum, k = cfg["maxn"], cfg["main"]
-    pools, recent_counts, all_counts = _candidate_sets(game, rows, seed)
+    pools, recent_counts, all_counts = _candidate_sets(game, rows, seed, count=candidate_count)
     max_overlap = max(1, k - 3) if k >= 5 else k - 1
     selected, used = [], set()
     for idx, (strategy, label) in enumerate(STRATEGIES):

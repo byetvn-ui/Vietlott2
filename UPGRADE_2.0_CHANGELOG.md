@@ -8,7 +8,12 @@
 ## File đã sửa
 - `.github/workflows/update.yml`: thêm bước `server.py --validate-data` sau đồng bộ; validator luôn chạy cả khi sync có lỗi/partial update; nếu validator lỗi thì chặn Analytics, Evaluation, Prediction và bước lưu/push; bước lưu chỉ chạy khi validator thành công; giữ nguyên đủ 5 chỉ thị `continue-on-error` gốc, thêm 1 chỉ thị cho validator và giữ cơ chế push retry. Nếu validator lỗi, các engine và bước lưu/push bị chặn.
 - `server.py`: validator dùng chung cho luật ba game; xác nhận ngày; kiểm tra toàn bộ ODS; CLI `--validate-data`; ghi nhật ký đồng bộ append-only `sync_audit.jsonl` với nguồn, số bản ghi, lỗi, trạng thái và số kỳ thêm; bỏ qua sự kiện lặp để tránh commit mỗi lần polling 5 phút.
-- `prediction.py`: sửa metadata miền số phụ Power 6/55, dùng fallback `maxn=55` thay vì 0.
+- `prediction.py`: xác định miền số phụ Power 6/55 bằng fallback `maxn=55`; tối ưu tìm gap bằng một lượt quét lịch sử.
+- `analytics.py`: thêm kỳ vọng cặp/bộ ba theo mô hình rút đều, z xấp xỉ có cảnh báo đa kiểm định; tách thống kê 535 theo 13h/21h; tối ưu gap.
+- `evaluation.py`: thêm backtest walk-forward cho danh mục 5 vé production so với 120 danh mục random/kỳ có cùng giới hạn overlap; ghi nhận tỷ lệ có ít nhất một vé đạt ≥2 số, tỷ lệ vé ≥2, trung bình số trùng và best-ticket hits. Backtest dùng pool 64 ứng viên/nhánh thay vì 320 ở production để giảm thời gian chạy; được ghi rõ trong output.
+- `server.py`: audit đồng bộ thêm fingerprint SHA-256 theo nguồn cho tối đa 10 kỳ mới nhất, đánh dấu đồng thuận/mâu thuẫn.
+- `analytics.js`: hiển thị baseline cặp/bộ ba, phân tầng 535 và so sánh danh mục 5 vé với random portfolio.
+- `sw.js`: nâng cache lên `vietlott-v7`.
 - `index.html`: chuyển sang 6 tab; tách Lab; gom 3 công cụ vào Công cụ; mặc định Gọn; lưu lựa chọn density trên từng trình duyệt; thu gọn backtest, Analytics, Evaluation, lịch sử và Jackpot; gộp biểu đồ/bảng Jackpot; giảm hiệu ứng card và cải thiện responsive.
 - `analytics.js`: đồng bộ 5 vé đã khóa lên trang Dự đoán; hiển thị lịch sử dự đoán trong Lab.
 - `manifest.json`: cập nhật tên và mô tả PWA cho cả ba game.
@@ -36,5 +41,8 @@
 - Parse YAML workflow; xác nhận đúng 5 `continue-on-error: true`.
 - Kiểm thử trình duyệt tự động chưa hoàn tất vì môi trường chạy chặn truy cập cả localhost và `file://`; không coi đó là test đạt.
 
-## Phạm vi chưa được tuyên bố hoàn tất
-Evaluation Engine vẫn cần backtest trực tiếp logic `build_five()` với danh mục random tương đương; Analytics cần kiểm tra sâu hơn về hiệu chỉnh kỳ vọng; cần kiểm thử giao diện trên thiết bị thật; audit nguồn lịch sử cần thêm bước đối soát lại các kỳ cũ. Xem `VIETLOTT2_2.0_ROADMAP.md`.
+## Giới hạn còn lại
+- Backtest 5 vé tái sử dụng 5 nhánh và giới hạn overlap production nhưng giảm pool tìm kiếm từ 320 xuống 64 ứng viên/nhánh; không phải mô phỏng bit-for-bit của tham số production.
+- Audit fingerprint chỉ bắt đầu có hiệu lực ở các lần đồng bộ mới; chưa có hash nguồn lịch sử cho các kỳ trước đó.
+- Kiểm thử trình duyệt thực, accessibility bằng screen reader và kiểm thử offline PWA trên iPhone/Android cần thiết bị thật.
+- Trợ lý Anthropic chưa được gọi live vì không có API key được cấp trong môi trường kiểm thử.

@@ -10,40 +10,41 @@ Hoàn thiện đồng đều Power 6/55, Mega 6/45 và Lotto 5/35. Không thay k
 - Giữ đỏ/vàng thương hiệu; giảm bóng, viền và card lặp; Lab tách khỏi Dự đoán.
 - Các bảng phụ, backtest và giải thích dài thu gọn; dữ liệu cốt lõi không bị xóa.
 
-## Giai đoạn 1 – Data Engine (đang triển khai)
+## Data Engine — đã triển khai
 - Dùng validator chung cho ba luật game.
 - 655: số phụ 1–55 và không trùng 6 số chính.
 - 645: đúng 6 số chính, không có số phụ.
 - 535: 5 số chính 1–35; số đặc biệt 1–12, được phép trùng số chính; giờ quay 13h/21h.
 - Kiểm tra ngày, khóa kỳ, thứ tự, trùng kỳ và dữ liệu ODS.
 - Chạy cổng `server.py --validate-data` sau sync, trước khi tạo báo cáo mới.
-- Bước tiếp theo: ghi audit nguồn theo từng kỳ (tên nguồn, timestamp, đồng thuận, conflict, hash dữ liệu) và quy trình đối soát lịch sử.
+- Audit đồng bộ mới ghi tên nguồn, timestamp, fingerprint SHA-256 từng nguồn cho tối đa 10 kỳ gần nhất, đồng thuận/mâu thuẫn và lỗi. Chưa tái dựng audit cho toàn bộ lịch sử cũ.
 
-## Giai đoạn 2 – Analytics Engine
+## Analytics Engine — đã triển khai
 - Tách thống kê số chính và số phụ/đặc biệt.
 - 535 phân tầng theo giờ 13h/21h.
-- Cặp/bộ ba và anomaly phải có mốc kỳ vọng ngẫu nhiên, không diễn giải tần suất thành khả năng dự đoán.
-- Thêm kiểm thử schema, tính xác định và tính toàn vẹn output.
+- Cặp/bộ ba có mốc kỳ vọng theo mô hình rút đều; z-score xấp xỉ chỉ dùng sàng lọc mô tả, không phải tín hiệu dự báo.
+- 535 phân tầng tần suất số chính/số đặc biệt theo 13h và 21h.
+- Kiểm thử schema, tính xác định và tính toàn vẹn output.
 
-## Giai đoạn 3 – Evaluation Engine
+## Evaluation Engine — đã triển khai với giới hạn được công bố
 - Backtest walk-forward, không lookahead.
-- So sánh cả 5 vé thực tế của Prediction Engine với danh mục random cùng số vé và cùng luật đa dạng hóa.
-- Báo cáo CI, p-value, hiệu chỉnh đa kiểm định, phân đoạn thời gian và cỡ mẫu.
-- Kiểm tra công bằng random baseline, seed, simulation count và độ nhạy kết quả.
+- So sánh danh mục 5 vé dùng 5 nhánh production với 120 danh mục random mỗi kỳ, cùng số vé và giới hạn overlap.
+- Báo cáo tỷ lệ có ít nhất một vé ≥2 số, tỷ lệ vé ≥2, số trúng trung bình, best-ticket hits, CI, p-value, BH và phân đoạn.
+- Giới hạn: backtest dùng pool 64 ứng viên/nhánh thay vì 320 ở production để kiểm soát thời gian; đây không phải tái tạo bit-for-bit toàn bộ ngân sách tìm kiếm production.
 - Không tuyên bố có lợi thế nếu hiệu ứng không ổn định và không tái lập.
 
-## Giai đoạn 4 – Prediction Engine
+## Prediction Engine — đã triển khai
 - Lưu phiên bản thuật toán, seed, tham số, signature dữ liệu và target draw.
-- Sửa metadata miền số phụ; bảo đảm vé khóa bất biến.
+- Sửa metadata miền số phụ cho dự đoán mới; giữ event lịch sử bất biến và chú giải metadata sai cũ bằng audit append-only.
 - Kiểm soát overlap/coverage nhưng không tuyên bố tăng xác suất trúng.
 - Backtest đúng logic tạo 5 vé production.
 
-## Giai đoạn 5 – UI/PWA
+## UI/PWA — cấu trúc và cache đã triển khai; kiểm thử thiết bị còn lại
 - Kiểm thử mobile-first, bàn phím, screen reader, reduced motion.
 - Kiểm thử cache, offline fallback và nâng phiên bản service worker.
 - Trạng thái dữ liệu phải phân biệt xác nhận, chờ nguồn, stale và lỗi; không biến thiếu dữ liệu thành 0.
 
-## Giai đoạn 6 – Release gate
+## Release gate — đang nghiệm thu
 - Unit + integration + regression tests.
 - Validate ODS trước và sau sync.
 - Parse JSON/JSONL và kiểm tra schema.

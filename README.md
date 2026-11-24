@@ -14,14 +14,15 @@ Website tĩnh chạy trên GitHub Pages, bot Python chạy qua GitHub Actions. D
 
 - `index.html` — giao diện dò vé, thống kê, lịch sử, các game, giao diện sáng/tối/tự động, hiệu ứng bi và Thần Tài, số người trúng giải, jackpot, cảnh báo dữ liệu cũ và backtest cũ.
 - `server.py` — đồng bộ kết quả từ nhiều nguồn, đối chiếu nguồn, cập nhật ODS, sinh `data.js`, lấy số người trúng, bổ sung jackpot và gửi Telegram.
-- `analyze.py` — nhận xét AI tùy chọn; cần secret `ANTHROPIC_API_KEY`.
-- `sw.js` — service worker; cache đã được nâng lên `vietlott-v3` để tránh giữ JavaScript cũ.
+- `analyze.py` — nhận xét AI tùy chọn trong GitHub Actions; cần secret `ANTHROPIC_API_KEY`.
+- `/api/assistant` trong `server.py` — trợ lý hỏi đáp theo game, chỉ gọi Anthropic khi người dùng chủ động bấm gửi; API key chỉ nằm ở backend.
+- `sw.js` — service worker; cache hiện tại `vietlott-v7` để tránh giữ JavaScript cũ.
 - `655.ods`, `645.ods`, `535.ods`, `data.js`, `winners.json` — dữ liệu nguồn/bot quản lý; không sửa tay.
 
 ### Engine mới
 
-- `analytics.py` → `analytics.json`: tần suất theo cửa sổ 20/60/120/toàn bộ kỳ; số lâu chưa xuất hiện; khoảng cách/chu kỳ giữa các lần xuất hiện; cặp/bộ ba; phân phối tổng, chẵn/lẻ, nửa thấp/cao; cảnh báo độ lệch mô tả; thống kê số phụ/đặc biệt riêng. 5/35 còn tách số kỳ theo 13h/21h.
-- `evaluation.py` → `evaluation.json`: đánh giá 7 phương pháp bằng walk-forward nghiêm ngặt; mô phỏng đối chứng ngẫu nhiên seed cố định; khoảng tin cậy 95%; hiệu chỉnh Benjamini–Hochberg cho 7 phép thử; báo cáo các đoạn 100 kỳ.
+- `analytics.py` → `analytics.json`: tần suất theo cửa sổ 20/60/120/toàn bộ kỳ; số lâu chưa xuất hiện; khoảng cách/chu kỳ giữa các lần xuất hiện; cặp/bộ ba kèm kỳ vọng dưới mô hình rút đều; phân phối tổng, chẵn/lẻ, nửa thấp/cao; cảnh báo độ lệch mô tả; thống kê số phụ/đặc biệt riêng. 5/35 phân tầng tần suất số chính/số đặc biệt theo 13h/21h.
+- `evaluation.py` → `evaluation.json`: đánh giá 7 phương pháp bằng walk-forward nghiêm ngặt; random control một vé; và backtest danh mục 5 vé production so với danh mục random 5 vé có cùng giới hạn giao nhau; CI95, hiệu chỉnh BH cho 7 phương pháp, phân đoạn 100 kỳ. Để giữ thời gian chạy khả thi trên toàn lịch sử, walk-forward tái tạo cùng 5 nhánh và quy tắc chọn vé nhưng dùng pool 64 ứng viên/nhánh (production hiện dùng 320); đây là giới hạn cần đọc cùng kết quả.
 - `prediction.py` → `predictions_log.jsonl`: sinh 5 vé theo ensemble có kiểm soát giao nhau; khóa bản ghi trước giờ quay; sau khi kết quả xuất hiện, thêm một event đối chiếu mới. Bản ghi dự đoán cũ không bị sửa.
 - `analytics.js`: khu **AI Prediction Lab** trên website. Chỉ tải JSON do Actions tạo; không chạy backtest hay mô phỏng nặng trên điện thoại.
 - `tests/test_engines.py`: kiểm tra quy tắc riêng game, tính tái lập, walk-forward, BH, độ đa dạng và lịch sử dự đoán.
@@ -40,11 +41,22 @@ Website tĩnh chạy trên GitHub Pages, bot Python chạy qua GitHub Actions. D
 
 Bảy phương pháp được giữ để có thể so sánh công bằng; không phương pháp nào được mặc định là có lợi thế.
 
+
+## AI Analyst hội thoại (tuỳ chọn, có thể tính phí)
+
+- Các engine `analytics.py`, `evaluation.py`, `prediction.py`, giao diện AI Lab và thống kê cục bộ **không gọi API mô hình**, nên không phát sinh token AI.
+- Trợ lý hội thoại `/api/assistant` dùng Anthropic API và chỉ được gọi khi người dùng chủ động gửi câu hỏi. Nhà cung cấp tính phí theo token đầu vào/đầu ra; phí API tách biệt với gói ChatGPT.
+- API key chỉ đọc từ biến môi trường `ANTHROPIC_API_KEY` ở máy chủ. Không đưa key vào `index.html`, `analytics.js`, GitHub Pages hoặc file dữ liệu công khai.
+- Chạy backend tự quản lý: đặt `ANTHROPIC_API_KEY` trong môi trường của máy chủ trước khi chạy `python3 server.py`. Có thể cấu hình `ANTHROPIC_MODEL` và `ANTHROPIC_API_URL` bằng biến môi trường. Không cấu hình key thì trợ lý hội thoại tắt, các engine còn lại vẫn hoạt động.
+- GitHub Pages là hosting tĩnh, không chạy endpoint Python này. Vì vậy trợ lý hội thoại chỉ hoạt động khi frontend được phục vụ cùng backend `server.py` hoặc khi triển khai một backend riêng an toàn; không gửi API key từ trình duyệt.
+- Backend giới hạn nội dung câu hỏi 1.200 ký tự, kích thước request 4 KB và tối thiểu 15 giây giữa các lần gọi trên cùng tiến trình. Không lưu nội dung câu hỏi vào lịch sử.
+- Mặc định `server.py` chỉ bind `127.0.0.1`. Không mở backend có API key ra Internet (`--host 0.0.0.0`) nếu chưa đặt lớp xác thực và giới hạn tần suất ở reverse proxy; giới hạn 15 giây trong tiến trình không thay thế bảo vệ truy cập công khai.
+
 ## Quy tắc kiểm định
 
 1. **Walk-forward:** ODS lưu mới nhất ở đầu. Khi đánh giá mục tiêu tại vị trí `t`, engine chỉ truyền `rows[t+1:]` (các kỳ cũ hơn) vào bộ sinh số. Kỳ đích không tham gia tính đặc trưng.
 2. **Không tối ưu trên kỳ đích:** cửa sổ mặc định 20 kỳ và công thức được cố định trước khi đánh giá; không dùng kết quả mục tiêu để điều chỉnh tham số.
-3. **Đối chứng ngẫu nhiên:** 120 vé ngẫu nhiên có seed ổn định cho mỗi kỳ mục tiêu, tái lập được.
+3. **Đối chứng ngẫu nhiên:** 120 vé random đơn có seed ổn định cho mỗi kỳ mục tiêu. Ngoài ra có 120 danh mục random/kỳ, mỗi danh mục 5 vé và áp dụng cùng ngưỡng overlap; đây là đối chứng phù hợp hơn với cách mua 5 vé.
 4. **Khoảng tin cậy:** CI 95% Wilson cho tỷ lệ đạt ít nhất 2 số; CI cho đối chứng ngẫu nhiên và CI chênh lệch ghép cặp so với random được báo riêng.
 5. **Nhiều phép thử:** p-value một phía của chênh lệch ghép cặp tỷ lệ đạt ≥2 so với đối chứng được hiệu chỉnh Benjamini–Hochberg trên 7 phương pháp. q-value không phải bằng chứng dự báo.
 6. **Ổn định theo thời gian:** kết quả được chia đoạn 100 kỳ mục tiêu, tính từ kỳ đích gần nhất.

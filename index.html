@@ -576,6 +576,15 @@ body[data-density="compact"] .note{font-size:13px}
     <p class="hint">Nơi xem 5 bộ đã khóa, phân tích dữ liệu và kiểm định hiệu quả. Dữ liệu nặng được tính ở GitHub Actions; điện thoại chỉ đọc JSON.</p>
     <div class="hint" id="labStatus">Đang tải dữ liệu Lab…</div>
     <div id="labPrediction"></div>
+    <section class="fold secondary-detail" id="labAssistant" aria-labelledby="labAssistantTitle" style="margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:12px">
+      <h3 id="labAssistantTitle" style="margin:0 0 6px">🤖 AI Analyst · Hỏi về dữ liệu</h3>
+      <p class="hint">Trợ lý chỉ đọc thống kê và kiểm định của game đang chọn. Gọi API bên ngoài chỉ khi máy chủ đã cấu hình key; mỗi câu hỏi có thể phát sinh phí token.</p>
+      <div class="hint" id="assistantStatus" role="status">Đang kiểm tra khả năng AI…</div>
+      <label class="hint" for="assistantQuestion">Câu hỏi của mày</label>
+      <textarea id="assistantQuestion" maxlength="1200" rows="3" placeholder="Ví dụ: phương pháp nào ổn định hơn đối chứng ngẫu nhiên, và độ bất định lớn đến đâu?" style="width:100%;box-sizing:border-box;margin:6px 0;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"></textarea>
+      <button class="btn" id="assistantSend" type="button" disabled>Gửi câu hỏi tới AI</button>
+      <div id="assistantAnswer" class="hint" aria-live="polite" style="white-space:pre-wrap;margin-top:10px"></div>
+    </section>
     <details class="fold secondary-detail"><summary>📊 Analytics Engine · Phân tích dữ liệu</summary><div id="labAnalytics" class="hint">Chưa có analytics.json.</div></details>
     <details class="fold secondary-detail"><summary>🧮 Evaluation Engine · Kiểm định</summary><div id="labEvaluation" class="hint">Chưa có evaluation.json.</div></details>
     <details class="fold secondary-detail"><summary>📚 Lịch sử dự đoán đã khóa</summary><div id="labHistory" class="hint">Chưa có lịch sử dự đoán.</div></details>

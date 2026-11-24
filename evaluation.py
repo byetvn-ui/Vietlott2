@@ -25,6 +25,7 @@ METHOD_LABELS = {
 MIN_TRAIN = 60
 DEFAULT_N = 20
 RANDOM_REPS = 120
+PORTFOLIO_REPS = 120
 SEGMENT_SIZE = 100
 
 
@@ -70,8 +71,15 @@ def method_sets(game, train, n_window, seed):
     n_window = min(max(1, n_window), len(train))
     recent = Counter(x for row in train[:n_window] for x in row["n"])
     total = Counter(x for row in train for x in row["n"])
-    gap = {n: next((i for i, row in enumerate(train) if n in row["n"]), len(train))
-           for n in range(1, maximum + 1)}
+    gap = {n: len(train) for n in range(1, maximum + 1)}
+    unseen = set(gap)
+    for i, row in enumerate(train):
+        for n in row["n"]:
+            if n in unseen:
+                gap[n] = i
+                unseen.remove(n)
+        if not unseen:
+            break
     f_recent = [0] + [recent[n] for n in range(1, maximum + 1)]
     f_total = [0] + [total[n] for n in range(1, maximum + 1)]
     f_gap = [0] + [gap[n] for n in range(1, maximum + 1)]
@@ -103,8 +111,11 @@ def method_sets(game, train, n_window, seed):
         bmax = cfg.get("bmax", maximum)
         b_recent = Counter(r.get("b") for r in train[:n_window] if r.get("b") is not None)
         b_total = Counter(r.get("b") for r in train if r.get("b") is not None)
-        bgap = {n: next((i for i, r in enumerate(train) if r.get("b") == n), len(train))
-                for n in range(1, bmax + 1)}
+        bgap = {n: len(train) for n in range(1, bmax + 1)}
+        for i, row in enumerate(train):
+            value = row.get("b")
+            if value in bgap and bgap[value] == len(train):
+                bgap[value] = i
         bzn = zscores([0] + [b_recent[n] for n in range(1, bmax + 1)], bmax)
         bza = zscores([0] + [b_total[n] for n in range(1, bmax + 1)], bmax)
         bzg = zscores([0] + [bgap[n] for n in range(1, bmax + 1)], bmax)
@@ -170,6 +181,33 @@ def bh_adjust(pvalues):
     return adjusted
 
 
+def random_diversified_portfolio(game, rng, ticket_count=5):
+    """Uniform random portfolio under the same pairwise-overlap cap as production."""
+    cfg = server.GAMES[game]
+    maximum, k = cfg["maxn"], cfg["main"]
+    max_overlap = max(1, k - 3) if k >= 5 else k - 1
+    selected = []
+    # Rejection sampling keeps every ticket uniformly drawn from valid k-combinations.
+    for _ in range(ticket_count):
+        chosen = None
+        for _attempt in range(200):
+            candidate = tuple(sorted(rng.sample(range(1, maximum + 1), k)))
+            if candidate in selected:
+                continue
+            if all(len(set(candidate) & set(old)) <= max_overlap for old in selected):
+                chosen = candidate
+                break
+        if chosen is None:
+            # Guaranteed-valid fallback: choose only numbers not used by earlier tickets.
+            # All three games have enough numbers for five disjoint main-number sets.
+            available = [n for n in range(1, maximum + 1) if all(n not in old for old in selected)]
+            if len(available) < k:
+                raise RuntimeError("Không thể tạo random portfolio thỏa giới hạn overlap")
+            chosen = tuple(sorted(rng.sample(available, k)))
+        selected.append(chosen)
+    return selected
+
+
 def evaluate_game(game, rows):
     cfg = server.GAMES[game]
     maximum, k = cfg["maxn"], cfg["main"]
@@ -179,6 +217,11 @@ def evaluate_game(game, rows):
     method_ge2 = {m: [] for m in METHODS}
     method_bonus = {m: [] for m in METHODS}
     random_hits, random_ge2 = [], []
+    portfolio_prod_any_ge2, portfolio_prod_ticket_ge2 = [], []
+    portfolio_prod_mean_hits, portfolio_prod_max_hits = [], []
+    portfolio_prod_overlap_violations = []
+    portfolio_random_any_ge2, portfolio_random_ticket_ge2 = [], []
+    portfolio_random_mean_hits, portfolio_random_max_hits = [], []
     # ODS rows newest-first: target t sees only rows[t+1:] (strict walk-forward).
     for t in range(count):
         target = rows[t]
@@ -204,11 +247,50 @@ def evaluate_game(game, rows):
             h = len(set(ticket) & actual)
             sim_hits.append(h)
             sim_ge2 += int(h >= 2)
-        # Random control's per-draw mean and event rate are retained for paired comparison.
+        # Legacy single-ticket random baseline retained for continuity.
         random_hits.append(statistics.mean(sim_hits))
         random_ge2.append(sim_ge2 / RANDOM_REPS)
         rec["random_control"] = {"mean_hits": round(statistics.mean(sim_hits), 4),
                                  "ge2_rate": round(sim_ge2 / RANDOM_REPS, 4)}
+
+        # Compare the actual five-ticket production portfolio with five-ticket
+        # random portfolios under the same overlap cap and ticket budget.
+        from prediction import build_five
+        # Same production ensemble and selection constraints, with a smaller candidate
+        # search budget to keep full-history walk-forward tractable. This parameter is
+        # reported explicitly and can be sensitivity-tested against production's 320.
+        production_tickets, diversity = build_five(game, train,
+            stable_seed("production-portfolio-v1", game, key), candidate_count=64)
+        prod_hits = [len(set(ticket["numbers"]) & actual) for ticket in production_tickets]
+        prod_overlap_violations = sum(
+            1 for i in range(len(production_tickets)) for j in range(i)
+            if len(set(production_tickets[i]["numbers"]) & set(production_tickets[j]["numbers"])) > diversity["max_pair_overlap"])
+        portfolio_prod_any_ge2.append(int(any(h >= 2 for h in prod_hits)))
+        portfolio_prod_ticket_ge2.append(sum(h >= 2 for h in prod_hits) / len(prod_hits))
+        portfolio_prod_mean_hits.append(statistics.mean(prod_hits))
+        portfolio_prod_max_hits.append(max(prod_hits))
+        portfolio_prod_overlap_violations.append(prod_overlap_violations)
+
+        sim_any, sim_ticket_ge2, sim_mean, sim_max = [], [], [], []
+        for _ in range(PORTFOLIO_REPS):
+            portfolio = random_diversified_portfolio(game, rng, ticket_count=5)
+            hits = [len(set(ticket) & actual) for ticket in portfolio]
+            sim_any.append(int(any(h >= 2 for h in hits)))
+            sim_ticket_ge2.append(sum(h >= 2 for h in hits) / len(hits))
+            sim_mean.append(statistics.mean(hits))
+            sim_max.append(max(hits))
+        portfolio_random_any_ge2.append(statistics.mean(sim_any))
+        portfolio_random_ticket_ge2.append(statistics.mean(sim_ticket_ge2))
+        portfolio_random_mean_hits.append(statistics.mean(sim_mean))
+        portfolio_random_max_hits.append(statistics.mean(sim_max))
+        rec["production_portfolio"] = {"ticket_count": len(prod_hits), "hits": prod_hits,
+            "any_ticket_ge2": any(h >= 2 for h in prod_hits), "mean_hits_per_ticket": round(statistics.mean(prod_hits), 4),
+            "max_hits": max(prod_hits), "max_pair_overlap": diversity["max_pair_overlap"],
+            "overlap_violations": prod_overlap_violations}
+        rec["random_portfolio_control"] = {"simulations": PORTFOLIO_REPS,
+            "any_ticket_ge2_rate": round(statistics.mean(sim_any), 4),
+            "mean_hits_per_ticket": round(statistics.mean(sim_mean), 4),
+            "mean_max_hits": round(statistics.mean(sim_max), 4)}
         records.append(rec)
 
     metrics, pvalues = {}, {}
@@ -268,7 +350,36 @@ def evaluate_game(game, rows):
             "simulation_count": random_total
         },
         "methods": metrics, "segments": segments,
-        "interpretation": "Walk-forward không dùng kỳ đích. q-value BH hiệu chỉnh 7 phép thử; CI Wilson cho tỷ lệ đạt >=2. Không có ý nghĩa dự báo tương lai."
+        "production_portfolio": {
+            "ticket_count": 5, "draws_evaluated": count, "candidate_pool_per_strategy": 64,
+            "any_ticket_ge2_count": sum(portfolio_prod_any_ge2),
+            "any_ticket_ge2_rate": round(statistics.mean(portfolio_prod_any_ge2), 5) if count else None,
+            "any_ticket_ge2_ci95": wilson(sum(portfolio_prod_any_ge2), count),
+            "ge2_ticket_rate": round(statistics.mean(portfolio_prod_ticket_ge2), 5) if count else None,
+            "mean_hits_per_ticket": round(statistics.mean(portfolio_prod_mean_hits), 5) if count else None,
+            "mean_best_ticket_hits": round(statistics.mean(portfolio_prod_max_hits), 5) if count else None,
+            "draws_with_overlap_violation": sum(v > 0 for v in portfolio_prod_overlap_violations)
+        },
+        "five_ticket_random_control": {
+            "simulations_per_target": PORTFOLIO_REPS, "ticket_count_per_portfolio": 5,
+            "same_pairwise_overlap_cap_as_production": True,
+            "mean_any_ticket_ge2_rate": round(statistics.mean(portfolio_random_any_ge2), 5) if count else None,
+            "any_ticket_ge2_ci95_simulation_level": wilson(round(sum(portfolio_random_any_ge2) * PORTFOLIO_REPS), count * PORTFOLIO_REPS),
+            "mean_ge2_ticket_rate": round(statistics.mean(portfolio_random_ticket_ge2), 5) if count else None,
+            "mean_hits_per_ticket": round(statistics.mean(portfolio_random_mean_hits), 5) if count else None,
+            "mean_best_ticket_hits": round(statistics.mean(portfolio_random_max_hits), 5) if count else None,
+            "portfolio_simulation_count": count * PORTFOLIO_REPS
+        },
+        "portfolio_comparison": {
+            "any_ticket_ge2_rate_diff_vs_random": round(statistics.mean(
+                [portfolio_prod_any_ge2[i] - portfolio_random_any_ge2[i] for i in range(count)]), 5) if count else None,
+            "paired_diff_ci95": (lambda d: [round(statistics.mean(d)-1.96*(statistics.stdev(d)/math.sqrt(len(d))),5),
+                                               round(statistics.mean(d)+1.96*(statistics.stdev(d)/math.sqrt(len(d))),5)] if len(d)>1 else [None,None])(
+                [portfolio_prod_any_ge2[i] - portfolio_random_any_ge2[i] for i in range(count)]),
+            "paired_p_vs_random_one_sided": round(paired_pvalue(
+                [portfolio_prod_any_ge2[i] - portfolio_random_any_ge2[i] for i in range(count)]), 7) if count else None
+        },
+        "interpretation": "Walk-forward không dùng kỳ đích. q-value BH hiệu chỉnh 7 phép thử; CI Wilson cho tỷ lệ đạt >=2. Đối chứng danh mục random dùng cùng 5 vé và giới hạn overlap. Backtest dùng pool 64 thay vì 320 ứng viên/nhánh production; so sánh portfolio là kết quả hồi cứu khám phá, không chứng minh lợi thế dự báo tương lai."
     }
 
 
@@ -288,16 +399,19 @@ def main():
     try:
         with open(OUT, encoding="utf-8") as f:
             previous = json.load(f)
-        if previous.get("source_signature") == signature:
-            print("Evaluation Engine: dữ liệu không đổi, bỏ qua.")
+        if previous.get("source_signature") == signature and previous.get("engine_version") == 2:
+            print("Evaluation Engine: dữ liệu và phiên bản không đổi, bỏ qua.")
             return previous
     except (OSError, ValueError, TypeError):
         pass
     games = {}
     for game in ("655", "645", "535"):
-        games[game] = evaluate_game(game, server.read_ods(game))
+        rows = server.read_ods(game)
+        print("Evaluation Engine: đang kiểm định %s (%d kỳ)..." % (game, len(rows)), flush=True)
+        games[game] = evaluate_game(game, rows)
+        print("Evaluation Engine: hoàn tất %s (%d kỳ walk-forward)." % (game, games[game]["draws_evaluated"]), flush=True)
     payload = {
-        "schema_version": 1, "source_signature": signature, "generated_at": server.now_vn().isoformat(timespec="seconds"),
+        "schema_version": 2, "engine_version": 2, "source_signature": signature, "generated_at": server.now_vn().isoformat(timespec="seconds"),
         "method_order": list(METHODS), "method_labels": METHOD_LABELS,
         "games": games
     }

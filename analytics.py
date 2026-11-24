@@ -49,9 +49,15 @@ def analyze_game(game, rows):
             "least_frequent": [{"number": n, "count": freq.get(n, 0)}
                                for n in sorted(range(1, maximum + 1), key=lambda n: (freq.get(n, 0), n))[:10]]
         }
-    gaps = {}
-    for n in range(1, maximum + 1):
-        gaps[n] = next((i for i, row in enumerate(rows) if n in row["n"]), len(rows))
+    gaps = {n: len(rows) for n in range(1, maximum + 1)}
+    unseen = set(gaps)
+    for i, row in enumerate(rows):
+        for n in row["n"]:
+            if n in unseen:
+                gaps[n] = i
+                unseen.remove(n)
+        if not unseen:
+            break
     result["gap"] = [{"number": n, "draws_absent": gaps[n]}
                      for n in sorted(gaps, key=lambda n: (-gaps[n], n))[:12]]
 
@@ -79,10 +85,27 @@ def analyze_game(game, rows):
                 pair_counts[(nums[i], nums[j])] += 1
                 for q in range(j + 1, len(nums)):
                     triple_counts[(nums[i], nums[j], nums[q])] += 1
-    result["pairs"] = [{"numbers": list(ns), "count": c}
+    # Uniform-draw expectation is a reference baseline, not a predictive score.
+    pair_p = (k * (k - 1)) / (maximum * (maximum - 1))
+    triple_p = (k * (k - 1) * (k - 2)) / (maximum * (maximum - 1) * (maximum - 2)) if k >= 3 else 0
+    pair_expected = len(rows) * pair_p
+    triple_expected = len(rows) * triple_p
+    pair_sd = math.sqrt(len(rows) * pair_p * (1 - pair_p)) if rows else 0
+    triple_sd = math.sqrt(len(rows) * triple_p * (1 - triple_p)) if rows else 0
+    result["pairs"] = [{"numbers": list(ns), "count": c,
+                        "expected_uniform": round(pair_expected, 3),
+                        "z_approx": round((c - pair_expected) / pair_sd, 3) if pair_sd else 0}
                        for ns, c in pair_counts.most_common(15)]
-    result["triples"] = [{"numbers": list(ns), "count": c}
+    result["triples"] = [{"numbers": list(ns), "count": c,
+                          "expected_uniform": round(triple_expected, 3),
+                          "z_approx": round((c - triple_expected) / triple_sd, 3) if triple_sd else 0}
                          for ns, c in triple_counts.most_common(10)]
+    result["cooccurrence_baseline"] = {
+        "model": "uniform independent draws without replacement within each draw",
+        "pair_expected_per_specific_set": round(pair_expected, 4),
+        "triple_expected_per_specific_set": round(triple_expected, 4),
+        "warning": "Z xấp xỉ để sàng lọc mô tả; không hiệu chỉnh đa kiểm định và không phải tín hiệu dự báo."
+    }
 
     sums = [sum(r["n"]) for r in rows]
     odd = [sum(n % 2 for n in r["n"]) for r in rows]
@@ -113,8 +136,11 @@ def analyze_game(game, rows):
     if cfg["bonus"]:
         bmax = cfg.get("bmax", maximum)
         bc = Counter(r["b"] for r in rows if r.get("b") is not None)
-        bonus_gap = {n: next((i for i, r in enumerate(rows) if r.get("b") == n), len(rows))
-                     for n in range(1, bmax + 1)}
+        bonus_gap = {n: len(rows) for n in range(1, bmax + 1)}
+        for i, row in enumerate(rows):
+            value = row.get("b")
+            if value in bonus_gap and bonus_gap[value] == len(rows):
+                bonus_gap[value] = i
         bonus_cycles = []
         for n in range(1, bmax + 1):
             positions = [i for i, r in enumerate(rows) if r.get("b") == n]
@@ -135,6 +161,17 @@ def analyze_game(game, rows):
         result["draws_by_hour"] = {
             str(hour): sum(1 for r in rows if r.get("h") == hour) for hour in (13, 21)
         }
+        result["by_hour"] = {}
+        for hour in (13, 21):
+            hour_rows = [r for r in rows if r.get("h") == hour]
+            hour_freq = Counter(n for r in hour_rows for n in r["n"])
+            hour_bonus = Counter(r.get("b") for r in hour_rows if r.get("b") is not None)
+            result["by_hour"][str(hour)] = {
+                "draw_count": len(hour_rows),
+                "main_frequency": _top(hour_freq, 12),
+                "special_frequency": _top(hour_bonus, 12),
+                "mean_sum": round(statistics.mean(sum(r["n"]) for r in hour_rows), 2) if hour_rows else None
+            }
     return result
 
 
@@ -154,8 +191,8 @@ def main():
     try:
         with open(OUT, encoding="utf-8") as f:
             previous = json.load(f)
-        if previous.get("source_signature") == signature:
-            print("Analytics Engine: dữ liệu không đổi, bỏ qua.")
+        if previous.get("source_signature") == signature and previous.get("engine_version") == 2:
+            print("Analytics Engine: dữ liệu và phiên bản không đổi, bỏ qua.")
             return previous
     except (OSError, ValueError, TypeError):
         pass
@@ -163,7 +200,7 @@ def main():
     for game in ("655", "645", "535"):
         games[game] = analyze_game(game, server.read_ods(game))
     payload = {
-        "schema_version": 1, "source_signature": signature,
+        "schema_version": 2, "engine_version": 2, "source_signature": signature,
         "generated_at": server.now_vn().isoformat(timespec="seconds"),
         "games": games
     }

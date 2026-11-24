@@ -75,7 +75,8 @@
       <p class="hint">Cặp thường xuất hiện cùng nhau: ${pairs.slice(0,5).map(x=>`<b>${x.numbers.join("-")}</b> (${x.count})`).join(" · ") || "—"}</p>
       <p class="hint">Bộ ba nổi bật: ${triples.slice(0,4).map(x=>`<b>${x.numbers.join("-")}</b> (${x.count})`).join(" · ") || "—"}</p>
       <p class="hint">Phân phối tổng: ${esc(g.distribution?.sum?.min)}–${esc(g.distribution?.sum?.max)}, trung bình ${esc(g.distribution?.sum?.mean)}. Mức lệch tần suất 60 kỳ: <b>${esc(g.anomaly?.level || "—")}</b> (max |z|=${esc(g.anomaly?.max_abs_z ?? "—")}).</p>
-      ${g.bonus ? `<p class="hint">Số phụ/đặc biệt: phạm vi ${g.bonus.range.join("–")}. ${game==="535" ? "Tách riêng dữ liệu kỳ 13h và 21h." : "Được thống kê riêng với số chính."}</p>` : ""}
+      <p class="hint">Mốc cặp/bộ ba theo mô hình rút đều: kỳ vọng mỗi cặp ${esc(g.cooccurrence_baseline?.pair_expected_per_specific_set ?? "—")}, mỗi bộ ba ${esc(g.cooccurrence_baseline?.triple_expected_per_specific_set ?? "—")}. Z chỉ để sàng lọc mô tả, chưa hiệu chỉnh đa kiểm định.</p>
+      ${g.bonus ? `<p class="hint">Số phụ/đặc biệt: phạm vi ${g.bonus.range.join("–")}. ${game==="535" ? `Tách riêng 13h (${esc(g.by_hour?.["13"]?.draw_count ?? 0)} kỳ) và 21h (${esc(g.by_hour?.["21"]?.draw_count ?? 0)} kỳ).` : "Được thống kê riêng với số chính."}</p>` : ""}
       <p class="hint">Cập nhật: ${esc(data.generated_at || "—")}. ${esc(g.methodology || "")}</p>`;
   }
   function renderEvaluation(data, game) {
@@ -89,14 +90,50 @@
       <td>${esc(m.bh_q_value)}</td><td>${m.significant_after_bh_0_05 ? "Có" : "Không"}</td>
     </tr>`).join("");
     const random = g.random_control || {};
+    const prod = g.production_portfolio || {};
+    const portfolioRandom = g.five_ticket_random_control || {};
+    const portfolioComparison = g.portfolio_comparison || {};
     const segments = (g.segments || []).slice(0,5).map(s=>`#${s.target_offset[0]}–${s.target_offset[1]}: ${pct(s.rnd?.ge2_rate)}`).join(" · ");
     return `<div class="hint">Walk-forward: <b>${esc(g.draws_evaluated)}</b> kỳ · tối thiểu ${esc(g.minimum_training_draws)} kỳ huấn luyện · ${esc(g.random_simulations_per_target)} mô phỏng ngẫu nhiên/kỳ.</div>
-      <div class="note">Đối chứng ngẫu nhiên: TB ${esc(random.mean_hits_per_ticket)} số chính/vé · tỷ lệ ≥2 số ${pct(random.ge2_rate)} · CI95 ${random.ge2_ci95 ? pct(random.ge2_ci95[0])+"–"+pct(random.ge2_ci95[1]) : "—"}.</div>
+      <div class="note">Đối chứng ngẫu nhiên 1 vé: TB ${esc(random.mean_hits_per_ticket)} số chính/vé · tỷ lệ ≥2 số ${pct(random.ge2_rate)} · CI95 ${random.ge2_ci95 ? pct(random.ge2_ci95[0])+"–"+pct(random.ge2_ci95[1]) : "—"}.</div>
+      <div class="note">Danh mục 5 vé production: có ít nhất 1 vé đạt ≥2 số ở ${pct(prod.any_ticket_ge2_rate)} số kỳ · TB ${esc(prod.mean_hits_per_ticket)} số/vé. Random 5 vé cùng giới hạn overlap: ${pct(portfolioRandom.mean_any_ticket_ge2_rate)} số kỳ có ít nhất 1 vé ≥2 · TB ${esc(portfolioRandom.mean_hits_per_ticket)} số/vé (${esc(portfolioRandom.portfolio_simulation_count)} danh mục đối chứng). Chênh lệch production − random: ${pct(portfolioComparison.any_ticket_ge2_rate_diff_vs_random)}.</div>
       <p class="table-scroll-hint">↔ Vuốt ngang để xem đầy đủ các cột</p><div class="table-scroll table-scroll--wide" role="region" aria-label="Bảng kiểm định các phương pháp" tabindex="0"><table><thead><tr><th>Phương pháp</th><th>≥2 số</th><th>CI95</th><th>Δ vs ngẫu nhiên</th><th>BH q</th><th>Ý nghĩa*</th></tr></thead><tbody>${body}</tbody></table></div>
       <p class="hint">Các đoạn 100 kỳ gần nhất (tính từ kỳ đích mới nhất): ${segments || "—"}</p>
       <p class="hint">* Ý nghĩa thống kê sau hiệu chỉnh Benjamini–Hochberg ở ngưỡng 0,05. q-value không chứng minh lợi thế dự báo.</p>
       <p class="hint">${esc(g.interpretation || "")}</p>`;
   }
+  async function initAssistant() {
+    const status = $("#assistantStatus"), send = $("#assistantSend"), input = $("#assistantQuestion"), answer = $("#assistantAnswer");
+    if (!status || !send || !input || !answer || send.dataset.initialized === "1") return;
+    send.dataset.initialized = "1";
+    try {
+      const r = await fetch("/api/assistant/status", {cache:"no-store"});
+      if (!r.ok) throw new Error("not available");
+      const state = await r.json();
+      if (state.available) {
+        status.textContent = "AI đã cấu hình ở backend. Chỉ phát sinh phí khi bấm gửi câu hỏi.";
+        send.disabled = false;
+      } else {
+        status.textContent = "Chưa cấu hình API key ở backend. AI hội thoại đang tắt; Analytics/Evaluation vẫn miễn phí.";
+      }
+    } catch (_) {
+      status.textContent = "AI hội thoại cần backend server.py có cấu hình API key; GitHub Pages tĩnh không gọi API trực tiếp.";
+    }
+    send.addEventListener("click", async () => {
+      const message = input.value.trim();
+      if (!message) { answer.textContent = "Nhập câu hỏi trước khi gửi."; return; }
+      send.disabled = true; answer.textContent = "Đang chờ phản hồi AI…";
+      try {
+        const r = await fetch("/api/assistant", {method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({game:gameNow(), message})});
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Không gọi được AI.");
+        answer.textContent = data.answer || "AI không trả về nội dung.";
+      } catch (e) { answer.textContent = e.message || "Không gọi được AI."; }
+      finally { send.disabled = false; }
+    });
+  }
+
   async function refresh() {
     const status=$("#labStatus"), pred=$("#labPrediction"), ana=$("#labAnalytics"), eva=$("#labEvaluation"), hist=$("#labHistory");
     if (!status || !pred || !ana || !eva) return;
@@ -120,7 +157,7 @@
     if (e.target.closest("#gp button")) setTimeout(refresh,100);
     if (e.target.closest(".tab") || e.target.closest('[data-tab="pred"]')) setTimeout(refresh,150);
   });
-  document.addEventListener("DOMContentLoaded",refresh);
-  setTimeout(refresh,1200);
+  document.addEventListener("DOMContentLoaded",()=>{refresh();initAssistant();});
+  setTimeout(()=>{refresh();initAssistant();},1200);
   setInterval(()=>{ if (!$("#t-lab")?.hidden || !$("#t-pred")?.hidden) refresh(); },60000);
 })();

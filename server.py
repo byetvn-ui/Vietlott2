@@ -79,6 +79,7 @@ STATUS = {g: dict(last_check=None, last_ok=None, error=None, new_at=None, last_a
 LAST_TRY = {g: 0.0 for g in GAMES}
 LAST_MANUAL = 0.0
 LAST_WIN = [0.0]
+LAST_ASSISTANT = [0.0]
 
 
 def hrs(g):
@@ -671,15 +672,35 @@ def gather(g):
 
 
 def write_sync_audit(game, sources, errors, added, latest_before, outcome):
-    """Append-only operational audit; source names/counts are recorded, never credentials or HTML."""
+    """Append-only source audit with per-draw fingerprints; never stores credentials or HTML."""
     path = os.path.join(BASE, "sync_audit.jsonl")
+    import hashlib
+    import json as _json
+    sources = sources or {}
+    recent_keys = sorted({key for rows in sources.values() for key in rows}, reverse=True)[:10]
+    draw_checks = []
+    for key in recent_keys:
+        fingerprints = {}
+        for source_name, source_rows in sorted(sources.items()):
+            row = source_rows.get(key)
+            if row is None:
+                fingerprints[source_name] = None
+                continue
+            canonical = {field: row.get(field) for field in ("d", "h", "n", "b", "j") if field in row}
+            raw = _json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            fingerprints[source_name] = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        present = [v for v in fingerprints.values() if v is not None]
+        draw_checks.append({"draw": key, "source_fingerprints": fingerprints,
+                            "agreement": bool(present) and len(set(present)) == 1,
+                            "sources_present": len(present)})
     event = {
         "timestamp": now_vn().isoformat(timespec="seconds"),
         "game": game,
         "outcome": outcome,
         "latest_before": latest_before or None,
-        "sources": {name: len(rows) for name, rows in (sources or {}).items()},
-        "source_names": sorted((sources or {}).keys()),
+        "sources": {name: len(rows) for name, rows in sources.items()},
+        "source_names": sorted(sources.keys()),
+        "draw_checks": draw_checks,
         "errors": list(errors or []),
         "draws_added": int(added or 0),
     }
@@ -827,6 +848,83 @@ def api_payload():
         return dict(games=load_games(), status=STATUS, server_time=now_vn().isoformat(timespec="seconds"))
 
 
+def assistant_status():
+    """Expose capability only; never return API credentials or provider internals."""
+    return {"available": bool(os.environ.get("ANTHROPIC_API_KEY")),
+            "provider": "Anthropic" if os.environ.get("ANTHROPIC_API_KEY") else None,
+            "mode": "optional"}
+
+
+def assistant_context(game):
+    """Build a compact, game-scoped context; omit raw draw history and secrets."""
+    context = {"game": game, "game_name": GAMES[game]["name"]}
+    try:
+        with open(os.path.join(BASE, "analytics.json"), encoding="utf-8") as f:
+            raw = json.load(f).get("games", {}).get(game, {})
+        context["analytics"] = {
+            "draw_count": raw.get("draw_count"), "latest_draw": raw.get("latest_draw"),
+            "windows": {w: {"draws": raw.get("windows", {}).get(w, {}).get("draws"),
+                            "frequency_top": raw.get("windows", {}).get(w, {}).get("frequency", [])[:8]}
+                        for w in ("20", "60", "120", "all") if w in raw.get("windows", {})},
+            "gap_top": (raw.get("gap") or [])[:8], "pairs_top": (raw.get("pairs") or [])[:5],
+            "triples_top": (raw.get("triples") or [])[:3],
+            "distribution": raw.get("distribution"), "anomaly": raw.get("anomaly"),
+            "bonus": ({"range": raw.get("bonus", {}).get("range"),
+                       "frequency_top": (raw.get("bonus", {}).get("frequency") or [])[:8],
+                       "gap_top": (raw.get("bonus", {}).get("gap") or [])[:8],
+                       "cycles_top": (raw.get("bonus", {}).get("cycles") or [])[:5]}
+                      if raw.get("bonus") else None)
+        }
+    except (OSError, ValueError, TypeError):
+        context["analytics"] = None
+    try:
+        with open(os.path.join(BASE, "evaluation.json"), encoding="utf-8") as f:
+            raw = json.load(f).get("games", {}).get(game, {})
+        methods = {}
+        for key, value in raw.get("methods", {}).items():
+            methods[key] = {field: value.get(field) for field in (
+                "label", "mean_hits", "ge2_rate", "ge2_ci95", "ge2_rate_diff_vs_random",
+                "paired_diff_ci95", "bh_q_value", "significant_after_bh_0_05")}
+        context["evaluation"] = {"draws_evaluated": raw.get("draws_evaluated"),
+                                 "minimum_training_draws": raw.get("minimum_training_draws"),
+                                 "random_control": raw.get("random_control"), "methods": methods,
+                                 "segments_recent": (raw.get("segments") or [])[:3],
+                                 "interpretation": raw.get("interpretation")}
+    except (OSError, ValueError, TypeError):
+        context["evaluation"] = None
+    try:
+        rows = read_ods(game)
+        context["latest_draw"] = rowkey(game, rows[0]) if rows else None
+        context["draw_count"] = len(rows)
+    except Exception:
+        context["latest_draw"] = None
+        context["draw_count"] = None
+    return context
+
+
+def call_assistant(game, message):
+    """Optional Anthropic call. The key stays server-side; no browser key or history."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        raise RuntimeError("AI_NOT_CONFIGURED")
+    model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
+    api = os.environ.get("ANTHROPIC_API_URL", "https://api.anthropic.com/v1/messages")
+    context = assistant_context(game)
+    prompt = ("Bạn là trợ lý phân tích Vietlott2. Trả lời bằng tiếng Việt, ngắn gọn, dựa trên JSON dữ liệu "
+              "được cung cấp. Phân biệt mô tả quá khứ với suy luận; không tuyên bố dự đoán được kết quả, "
+              "không khuyên mua vé, không bịa số liệu. Nếu thiếu dữ liệu thì nói rõ. Các kỳ quay độc lập.\n"
+              "DỮ LIỆU JSON:\n" + json.dumps(context, ensure_ascii=False, separators=(",", ":")) +
+              "\n\nCÂU HỎI NGƯỜI DÙNG:\n" + message)
+    body = json.dumps({"model": model, "max_tokens": 700,
+                       "messages": [{"role": "user", "content": prompt}]}).encode("utf-8")
+    req = Request(api, body, {"content-type": "application/json", "x-api-key": key,
+                              "anthropic-version": "2023-06-01"})
+    with urlopen(req, timeout=45) as response:
+        payload = json.load(response)
+    return "".join(part.get("text", "") for part in payload.get("content", [])
+                   if part.get("type") == "text").strip()
+
+
 # ───────────────────────── Lịch tự động ─────────────────────────
 
 def scheduler():
@@ -879,6 +977,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/api/data":
             return self._send(200, json.dumps(api_payload(), ensure_ascii=False).encode(), "application/json; charset=utf-8")
+        if path == "/api/assistant/status":
+            return self._send(200, json.dumps(assistant_status(), ensure_ascii=False).encode(), "application/json; charset=utf-8")
         if path in STATIC:
             fn, ct = STATIC[path]
             try:
@@ -890,7 +990,33 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global LAST_MANUAL
-        if self.path.split("?")[0] == "/api/sync":
+        path = self.path.split("?")[0]
+        if path == "/api/assistant":
+            if not assistant_status()["available"]:
+                return self._send(503, json.dumps({"error": "AI chưa được cấu hình API key ở máy chủ. Các chức năng thống kê vẫn hoạt động bình thường."}, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if length <= 0 or length > 4096:
+                    raise ValueError("Yêu cầu quá lớn hoặc không hợp lệ.")
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                game = str(payload.get("game", "655"))
+                message = str(payload.get("message", "")).strip()
+                if game not in GAMES or not message or len(message) > 1200:
+                    raise ValueError("Chọn game hợp lệ và nhập câu hỏi tối đa 1.200 ký tự.")
+                if time.time() - LAST_ASSISTANT[0] < 15:
+                    return self._send(429, json.dumps({"error": "Vui lòng chờ 15 giây giữa hai lần gọi AI."}, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+                LAST_ASSISTANT[0] = time.time()
+                answer = call_assistant(game, message)
+                if not answer:
+                    raise RuntimeError("AI không trả về nội dung.")
+                return self._send(200, json.dumps({"answer": answer}, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+            except ValueError as exc:
+                return self._send(400, json.dumps({"error": str(exc)}, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+            except Exception as exc:
+                # Do not expose upstream response bodies, credentials, or stack traces.
+                code = 502 if not isinstance(exc, RuntimeError) or str(exc) != "AI_NOT_CONFIGURED" else 503
+                return self._send(code, json.dumps({"error": "Không gọi được AI. Kiểm tra cấu hình API/model hoặc thử lại sau."}, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+        if path == "/api/sync":
             if time.time() - LAST_MANUAL < 20:  # chống bấm/gọi dồn dập
                 added = {g: 0 for g in GAMES}
             else:
