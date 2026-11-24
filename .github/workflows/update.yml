@@ -1,3 +1,4 @@
+
 name: Cập nhật kết quả
 
 on:
@@ -20,9 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Kiểm tra bộ đọc dữ liệu
+
+      - name: Kiểm tra bộ đọc dữ liệu và cấu trúc
         if: hashFiles('tests/**') != ''
         run: python3 -m unittest discover -s tests -t . -v
+
       - name: Lấy kết quả mới
         id: sync
         continue-on-error: true
@@ -30,25 +33,39 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python3 server.py --sync-once
+
+      # Kiểm tra lại dữ liệu SAU khi đồng bộ.
+      # Không cho Analytics/Evaluation/Prediction chạy nếu dữ liệu không hợp lệ.
+      - name: Kiểm tra toàn vẹn dữ liệu sau đồng bộ
+        id: validate_data
+        if: steps.sync.outcome == 'success'
+        run: python3 -m unittest tests.test_data_integrity -v
+
       - name: Phân tích AI (tuỳ chọn)
         if: hashFiles('analyze.py') != ''
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python3 analyze.py
+
       - name: Analytics Engine — thống kê ba game
         id: analytics
+        if: steps.sync.outcome != 'success' || steps.validate_data.outcome == 'success'
         continue-on-error: true
         run: python3 analytics.py
+
       - name: Evaluation Engine — walk-forward và đối chứng ngẫu nhiên
         id: evaluation
+        if: steps.sync.outcome != 'success' || steps.validate_data.outcome == 'success'
         continue-on-error: true
         run: python3 evaluation.py
+
       - name: Prediction Engine — khóa 5 bộ và đối chiếu lịch sử
         id: prediction
-        if: steps.sync.outcome == 'success'
+        if: steps.sync.outcome == 'success' && steps.validate_data.outcome == 'success'
         continue-on-error: true
         run: python3 prediction.py
+
       - name: Lưu thay đổi
         run: |
           set -e
@@ -84,6 +101,7 @@ jobs:
             fi
             sleep 2
           done
+
       - name: Báo lỗi nếu thất bại
-        if: steps.sync.outcome == 'failure' || steps.analytics.outcome == 'failure' || steps.evaluation.outcome == 'failure' || steps.prediction.outcome == 'failure'
+        if: steps.sync.outcome == 'failure' || steps.validate_data.outcome == 'failure' || steps.analytics.outcome == 'failure' || steps.evaluation.outcome == 'failure' || steps.prediction.outcome == 'failure'
         run: exit 1
