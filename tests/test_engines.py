@@ -38,9 +38,13 @@ class AnalyticsTests(unittest.TestCase):
             self.assertEqual(result["draw_count"],90)
             self.assertIn("60",result["windows"])
             self.assertTrue(result["pairs"])
+            self.assertIn("expected_uniform", result["pairs"][0])
+            self.assertIn("cooccurrence_baseline", result)
             self.assertTrue(result["cycles"])
             if game=="535":
                 self.assertEqual(result["draws_by_hour"],{"13":45,"21":45})
+                self.assertEqual(result["by_hour"]["13"]["draw_count"],45)
+                self.assertEqual(result["by_hour"]["21"]["draw_count"],45)
                 self.assertEqual(result["bonus"]["range"],[1,12])
 
 
@@ -71,6 +75,19 @@ class EvaluationTests(unittest.TestCase):
         self.assertTrue(all(0<=x<=1 for x in q))
         self.assertEqual(len(result["segments"]),1)
         self.assertEqual(result["random_control"]["simulation_count"],15*evaluation.RANDOM_REPS)
+        self.assertEqual(result["production_portfolio"]["ticket_count"],5)
+        self.assertEqual(result["five_ticket_random_control"]["portfolio_simulation_count"],15*evaluation.PORTFOLIO_REPS)
+        self.assertTrue(result["five_ticket_random_control"]["same_pairwise_overlap_cap_as_production"])
+        self.assertEqual(result["production_portfolio"]["draws_with_overlap_violation"],0)
+        self.assertIn("any_ticket_ge2_rate_diff_vs_random", result["portfolio_comparison"])
+        self.assertEqual(len(result["five_ticket_random_control"]["any_ticket_ge2_ci95_simulation_level"]),2)
+        for game in ("655","645","535"):
+            import random
+            portfolio=evaluation.random_diversified_portfolio(game,random.Random(123),5)
+            limit=max(1,server.GAMES[game]["main"]-3) if server.GAMES[game]["main"]>=5 else server.GAMES[game]["main"]-1
+            for i in range(5):
+                for j in range(i):
+                    self.assertLessEqual(len(set(portfolio[i]) & set(portfolio[j])),limit)
 
     def test_target_draw_is_not_part_of_training_features(self):
         rows=fake_rows("645",80)
@@ -136,6 +153,8 @@ class PredictionTests(unittest.TestCase):
                 ranges={e["game"]:e["parameters"]["special_range"] for e in originals}
                 self.assertEqual(ranges["655"],[1,55])
                 self.assertEqual(ranges["535"],[1,12])
+                self.assertTrue(all(e["parameters"]["special_range"] == [1,55]
+                                    for e in originals if e["game"] == "655"))
                 self.assertIsNone(ranges["645"])
                 for event in originals:
                     target=event["target_draw"]
