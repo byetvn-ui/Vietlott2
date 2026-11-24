@@ -92,7 +92,7 @@
     const segments = (g.segments || []).slice(0,5).map(s=>`#${s.target_offset[0]}–${s.target_offset[1]}: ${pct(s.rnd?.ge2_rate)}`).join(" · ");
     return `<div class="hint">Walk-forward: <b>${esc(g.draws_evaluated)}</b> kỳ · tối thiểu ${esc(g.minimum_training_draws)} kỳ huấn luyện · ${esc(g.random_simulations_per_target)} mô phỏng ngẫu nhiên/kỳ.</div>
       <div class="note">Đối chứng ngẫu nhiên: TB ${esc(random.mean_hits_per_ticket)} số chính/vé · tỷ lệ ≥2 số ${pct(random.ge2_rate)} · CI95 ${random.ge2_ci95 ? pct(random.ge2_ci95[0])+"–"+pct(random.ge2_ci95[1]) : "—"}.</div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Phương pháp</th><th>≥2 số</th><th>CI95</th><th>Δ vs ngẫu nhiên</th><th>BH q</th><th>Ý nghĩa*</th></tr></thead><tbody>${body}</tbody></table></div>
+      <p class="table-scroll-hint">↔ Vuốt ngang để xem đầy đủ các cột</p><div class="table-scroll table-scroll--wide" role="region" aria-label="Bảng kiểm định các phương pháp" tabindex="0"><table><thead><tr><th>Phương pháp</th><th>≥2 số</th><th>CI95</th><th>Δ vs ngẫu nhiên</th><th>BH q</th><th>Ý nghĩa*</th></tr></thead><tbody>${body}</tbody></table></div>
       <p class="hint">Các đoạn 100 kỳ gần nhất (tính từ kỳ đích mới nhất): ${segments || "—"}</p>
       <p class="hint">* Ý nghĩa thống kê sau hiệu chỉnh Benjamini–Hochberg ở ngưỡng 0,05. q-value không chứng minh lợi thế dự báo.</p>
       <p class="hint">${esc(g.interpretation || "")}</p>`;

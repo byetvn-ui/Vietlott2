@@ -98,6 +98,15 @@ select:focus,input:focus{outline:2px solid var(--gold2);outline-offset:1px}
 table{width:100%;border-collapse:collapse}
 th{font-size:14px;font-weight:800;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:10px 6px;border-bottom:3px solid var(--line)}
 td{padding:9px 6px;border-bottom:1.5px solid #f8ecd6;vertical-align:middle}
+/* Bảng dữ liệu: không bóp cột thành từng chữ trên màn hình hẹp. */
+.table-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--gold2) var(--cream);border-radius:10px}
+.table-scroll:focus-visible{outline:2px solid var(--gold2);outline-offset:3px}
+.table-scroll table{width:max-content;min-width:100%;margin:0}
+.table-scroll--wide table{min-width:720px}
+.table-scroll--medium table{min-width:440px}
+.table-scroll th,.table-scroll td{white-space:nowrap}
+.table-scroll th:first-child,.table-scroll td:first-child{min-width:148px}
+.table-scroll-hint{display:none;color:var(--mute);font-size:12px;margin:4px 0 7px}
 td.c{font-weight:900;font-size:18px;font-variant-numeric:tabular-nums}td.c small{font-weight:600;font-size:14px;color:var(--mute)}
 td.rk{color:var(--mute);font-weight:700;width:34px}
 .meter{height:10px;border-radius:99px;background:#fbefd9;overflow:hidden;min-width:70px}
@@ -458,6 +467,7 @@ td .ball{width:29px;height:29px;font-size:11.5px}
 body[data-density="compact"] .card{margin-bottom:12px}
 body[data-density="compact"] .hint{font-size:13.5px}
 body[data-density="compact"] .note{font-size:13px}
+@media(max-width:620px){.table-scroll-hint{display:block}.table-scroll--wide table{min-width:720px}.table-scroll--medium table{min-width:440px}}
 @media(max-width:420px){.app{padding:12px 10px 82px}.card{padding:13px}.tab{min-height:54px;font-size:13px}.tabs{gap:6px}.ball{width:38px;height:38px;font-size:15px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
@@ -536,7 +546,7 @@ body[data-density="compact"] .note{font-size:13px}
     <div class="hint" id="stSum"></div>
     <div class="modes" id="modes"></div>
     <div id="hls"></div><div id="extra"></div>
-    <table><thead><tr><th>#</th><th>Số</th><th>Số lần ra</th><th>Tỷ lệ</th></tr></thead><tbody id="stBody"></tbody></table>
+    <div class="table-scroll table-scroll--medium" role="region" aria-label="Bảng tần suất số" tabindex="0"><table><thead><tr><th>#</th><th>Số</th><th>Số lần ra</th><th>Tỷ lệ</th></tr></thead><tbody id="stBody"></tbody></table></div>
   </div>
 
   <!-- DỰ ĐOÁN -->
@@ -550,11 +560,11 @@ body[data-density="compact"] .note{font-size:13px}
     <div class="hint" id="predDesc" style="margin-top:12px"></div>
     <div class="res" id="predRes"></div>
     <details class="fold"><summary>📋 Bảng dự đoán đủ phương pháp</summary>
-    <div style="overflow-x:auto"><table><thead><tr><th>Phương pháp</th><th>Bộ số</th></tr></thead><tbody id="predAll"></tbody></table></div></details>
+    <div class="table-scroll table-scroll--medium" role="region" aria-label="Bảng dự đoán theo phương pháp" tabindex="0"><table><thead><tr><th>Phương pháp</th><th>Bộ số</th></tr></thead><tbody id="predAll"></tbody></table></div></details>
     <details class="fold"><summary>✅ Đối chiếu với kết quả</summary><div id="predRev"></div></details>
     <details class="fold secondary-detail"><summary>🧮 Kiểm chứng ngược / backtest cũ</summary>
       <p class="hint" id="btSub"></p>
-      <table><thead><tr><th>Phương pháp</th><th>TB số chính</th><th>≥2 số</th><th>≥3 số</th><th>≥4 số</th><th>Số phụ/ĐB</th><th>Cao nhất</th></tr></thead><tbody id="bt"></tbody></table>
+      <p class="table-scroll-hint">↔ Vuốt ngang để xem đầy đủ các cột</p><div class="table-scroll table-scroll--wide" role="region" aria-label="Bảng kết quả backtest" tabindex="0"><table><thead><tr><th>Phương pháp</th><th>TB số chính</th><th>≥2 số</th><th>≥3 số</th><th>≥4 số</th><th>Số phụ/ĐB</th><th>Cao nhất</th></tr></thead><tbody id="bt"></tbody></table></div>
     </details>
     <details class="info-fold"><summary aria-label="Giải thích về xác suất">ⓘ</summary><div class="info-copy">Mỗi kỳ quay độc lập; các phương pháp thống kê không làm tăng xác suất toán học của một vé.</div></details>
     </details>
@@ -579,7 +589,7 @@ body[data-density="compact"] .note{font-size:13px}
     <div class="row"><label for="hsYear">Hoặc lọc:</label><select id="hsYear"></select><select id="hsMonth"></select></div>
     <div class="hint" id="hsInfo"></div>
     <div class="flex" style="margin:0 0 8px"><button class="chip" id="hsNewer" type="button" hidden>⬆ 50 kỳ mới hơn</button></div>
-    <table><tbody id="hsBody"></tbody></table>
+    <div class="table-scroll" role="region" aria-label="Bảng lịch sử kết quả" tabindex="0"><table><tbody id="hsBody"></tbody></table></div>
     <div class="flex" style="margin-top:12px"><button class="chip" id="hsMore" type="button">⬇ Xem thêm 50 kỳ</button><button class="chip" id="hsAll" type="button">Hiện tất cả</button></div>
   </div>
   <div class="card" id="t-tools" hidden>
@@ -790,7 +800,7 @@ function jackpotCard(g) {
   }).join("");
   const th = store("jpTh" + g) || "";
   return `<div class="xt"><b>Chi tiết Jackpot và số người trúng</b>
-    <table style="margin-top:8px"><thead><tr><th>Kỳ</th><th>Jackpot</th><th>Trúng</th></tr></thead><tbody>${body}</tbody></table>
+    <div class="table-scroll" role="region" aria-label="Chi tiết Jackpot" tabindex="0"><table style="margin-top:8px"><thead><tr><th>Kỳ</th><th>Jackpot</th><th>Trúng</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="row" style="margin-top:8px"><label for="jpTh">🔔 Báo khi jackpot ≥</label><input id="jpTh" type="number" min="0" inputmode="numeric" value="${th}" placeholder="tỷ đồng" style="width:90px"> tỷ</div></div>`;
 }
 async function aiCard(g) {
@@ -931,9 +941,9 @@ function renderReview(g) {
   const sumH = METHODS.map(([k]) => { const tot = rv.reduce((a, x) => a + x.hits[k].length, 0), best = Math.max(...rv.map(x => x.hits[k].length));
     return `<tr><td>${pname(k)}</td><td class="c">${tot}</td><td class="c">${(tot / rv.length).toFixed(2)}</td><td class="c">${best}</td>${pB ? `<td class="c">${rv.filter(x => x.bhit[k]).length}</td>` : ""}</tr>`; }).join("");
   el.innerHTML = `<div class="hint" style="margin:0 0 6px">Kết quả ${fmtDraw(r)}:</div><div class="flex" style="gap:5px">${res}</div><div class="hint" style="margin:4px 0 10px">${setInfo(r.n)}</div>
-  <table><thead><tr><th>Phương pháp</th><th>Bộ đã dự đoán trước kỳ này</th></tr></thead><tbody>${rowsH}</tbody></table>
+  <div class="table-scroll table-scroll--medium" role="region" aria-label="Bộ dự đoán đã đối chiếu" tabindex="0"><table><thead><tr><th>Phương pháp</th><th>Bộ đã dự đoán trước kỳ này</th></tr></thead><tbody>${rowsH}</tbody></table></div>
   <div class="hint">Tổng hợp ${rv.length} kỳ gần nhất (chọn ngẫu nhiên kỳ vọng ≈ ${base.toFixed(2)} số/kỳ):</div>
-  <table><thead><tr><th>Phương pháp</th><th>Tổng</th><th>TB/kỳ</th><th>Cao nhất</th>${pB ? `<th>${BL} trúng</th>` : ""}</tr></thead><tbody>${sumH}</tbody></table>${pB ? `<div class="hint">${BL} trúng = số kỳ (trong ${rv.length} kỳ) dự đoán đúng ${G[g].pickB ? "số đặc biệt" : "số phụ"}; ngẫu nhiên kỳ vọng ≈ ${(rv.length / (G[g].bmax - (G[g].bdist ? K : 0))).toFixed(1)} kỳ.</div>` : ""}`;
+  <div class="table-scroll table-scroll--medium" role="region" aria-label="Tổng hợp đối chiếu dự đoán" tabindex="0"><table><thead><tr><th>Phương pháp</th><th>Tổng</th><th>TB/kỳ</th><th>Cao nhất</th>${pB ? `<th>${BL} trúng</th>` : ""}</tr></thead><tbody>${sumH}</tbody></table></div>${pB ? `<div class="hint">${BL} trúng = số kỳ (trong ${rv.length} kỳ) dự đoán đúng ${G[g].pickB ? "số đặc biệt" : "số phụ"}; ngẫu nhiên kỳ vọng ≈ ${(rv.length / (G[g].bmax - (G[g].bdist ? K : 0))).toFixed(1)} kỳ.</div>` : ""}`;
 }
 // Xác suất ngẫu nhiên chính xác theo phân phối siêu bội (không dùng xấp xỉ chuẩn).
 function hypergeomTail(max, k, threshold) {
