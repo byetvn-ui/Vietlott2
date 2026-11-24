@@ -527,7 +527,19 @@ td .ball{width:29px;height:29px;font-size:11.5px}
       <p class="hint" id="btSub"></p>
       <table><thead><tr><th>Phương pháp</th><th>TB số chính</th><th>≥2 số</th><th>≥3 số</th><th>≥4 số</th><th>Số phụ/ĐB</th><th>Cao nhất</th></tr></thead><tbody id="bt"></tbody></table>
     </details>
-    <div class="note"><b>Lưu ý thẳng thắn:</b> mỗi kỳ quay độc lập – mọi bộ số có xác suất trúng như nhau. Bảng kiểm chứng ngược cho thấy các công thức này không khác ngẫu nhiên đáng kể.</div>
+    <div class="note"><b>Lưu ý thẳng thắn:</b> mỗi kỳ quay độc lập – mọi bộ số hợp lệ có xác suất trúng như nhau. Backtest cũ chỉ để tham khảo; xem AI Prediction Lab bên dưới để kiểm định walk-forward dài hạn, đối chứng mô phỏng và hiệu chỉnh đa kiểm định.</div>
+
+    <div class="card" id="predictionLab" style="margin-top:18px">
+      <h2>🧪 AI Prediction Lab</h2>
+      <p class="hint">Bảng điều khiển thống kê, kiểm định và 5 bộ dự đoán đã được bot khóa trước giờ quay. Dữ liệu tính ở GitHub Actions; điện thoại chỉ đọc JSON.</p>
+      <div class="hint" id="labStatus">Đang tải dữ liệu Lab…</div>
+      <div id="labPrediction"></div>
+      <h3 style="font-size:17px;color:var(--red);margin:18px 0 8px">📊 Analytics Engine</h3>
+      <div id="labAnalytics" class="hint">Chưa có analytics.json.</div>
+      <h3 style="font-size:17px;color:var(--red);margin:18px 0 8px">🧮 Evaluation Engine</h3>
+      <div id="labEvaluation" class="hint">Chưa có evaluation.json.</div>
+      <p class="note"><b>Giới hạn khoa học:</b> các kỳ quay độc lập. Tần suất, chu kỳ, số lâu chưa ra và mô hình ensemble không làm tăng xác suất toán học của một vé. Giới hạn trùng giữa 5 vé chỉ tăng độ phủ danh mục vé, không tạo lợi thế dự báo.</p>
+    </div>
   </div>
 
   <!-- KẾT QUẢ -->
@@ -1519,5 +1531,6 @@ async function init() {
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
 init();
 </script>
+<script src="analytics.js" defer></script>
 </body>
 </html>
