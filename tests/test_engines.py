@@ -133,6 +133,10 @@ class PredictionTests(unittest.TestCase):
                 self.assertEqual(first["created"],3)
                 self.assertEqual(second["created"],0)
                 originals=[dict(e) for e in locked if e["event_type"]=="prediction"]
+                ranges={e["game"]:e["parameters"]["special_range"] for e in originals}
+                self.assertEqual(ranges["655"],[1,55])
+                self.assertEqual(ranges["535"],[1,12])
+                self.assertIsNone(ranges["645"])
                 for event in originals:
                     target=event["target_draw"]
                     date=target[:10]
