@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: vietlott2-ai
+    runtime: python
+    plan: starter
+    buildCommand: "true"
+    startCommand: "python assistant_api.py"
+    healthCheckPath: /api/assistant/status
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        sync: false
+      - key: ALLOWED_ORIGIN
+        value: https://byetvn-ui.github.io
