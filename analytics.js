@@ -58,7 +58,15 @@
       const ev = evals.get(p.prediction_id);
       const ticketCount = (p.tickets || []).length;
       const hits = ev ? (ev.tickets || []).reduce((n,t)=>n+(t.main_hits||0),0) : null;
-      return `<div class="nrow"><b>${fmtDraw(p.target_draw)}</b> · ${ticketCount} vé · <span class="badge ${ev ? "new" : "wait"}">${ev ? "Đã đối chiếu" : "Đang chờ"}</span>${ev ? `<div class="pc">Tổng số chính trùng trên danh mục: ${hits}</div>` : ""}<div class="pc">Tạo lúc ${esc(p.created_at || "—")} · phiên bản ${esc(p.algorithm_version || "—")}</div></div>`;
+      const hitSet = new Set(ev?.result_numbers || []);
+      const tk = (p.tickets || []).map((t,j) => {
+        const sc = ev?.tickets?.find(x => x.strategy === t.strategy);
+        const nums = (t.numbers || []).map(n => `<span class="ball sm${hitSet.has(n) ? "" : " plain"}">${n}</span>`).join(" ");
+        const bonus = t.bonus != null ? ` <span class="ball sm plain" title="Số phụ/đặc biệt">+${t.bonus}</span>` : "";
+        return `<div class="pc"><b>Bộ ${j+1}</b> · ${esc(t.label || t.strategy)}<div class="balls">${nums}${bonus}</div>${sc ? `<small>Trùng ${sc.main_hits}/${(t.numbers||[]).length}${sc.bonus_hit ? " · trúng số phụ" : ""}</small>` : ""}</div>`;
+      }).join("");
+      const res = ev ? `<div class="pc">Kết quả quay: <div class="balls">${(ev.result_numbers||[]).map(n=>`<span class="ball sm">${n}</span>`).join(" ")}${ev.result_bonus != null ? ` <span class="ball sm plain">+${ev.result_bonus}</span>` : ""}</div></div>` : "";
+      return `<div class="nrow"><b>${fmtDraw(p.target_draw)}</b> · ${ticketCount} vé · <span class="badge ${ev ? "new" : "wait"}">${ev ? "Đã đối chiếu" : "Đang chờ"}</span>${ev ? `<div class="pc">Tổng số chính trùng trên danh mục: ${hits}</div>` : ""}${res}${tk}<div class="pc">Tạo lúc ${esc(p.created_at || "—")} · phiên bản ${esc(p.algorithm_version || "—")}</div></div>`;
     }).join("");
   }
   function renderAnalytics(data, game) {
